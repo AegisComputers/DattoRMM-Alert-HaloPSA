@@ -44,6 +44,8 @@ Write-Host $AlertWebhook
 
 $Email = Get-AlertEmailBody -AlertWebhook $FullRequest
 
+Write-Host $Email
+
 if ($Email) {
     $Alert = $Email.Alert
 
@@ -126,7 +128,8 @@ if ($Email) {
         )
     }
 
-
+    Write-Host $HaloTicketCreate
+    
     # Handle reoccurring alerts
     if ($ReoccuringAlerts) {        
         $ReoccuringAlertParent = $ReoccuringAlerts | Sort-Object FaultID | Select-Object -First 1
