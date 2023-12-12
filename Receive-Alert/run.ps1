@@ -101,10 +101,11 @@ if ($Email) {
         tickettype_id    = 8
         details_html     = $HtmlBody
         DattoAlertState = 0
-        site_id          = 291
+        site_id          = 286
         assets           = @(@{id = $HaloDevice.did })
         priority_id      = $HaloPriority
         status_id        = $HaloTicketStatusID
+        category_1       = "Datto Alert"
         customfields     = @(
             @{
                 id    = $HaloCustomAlertTypeField
