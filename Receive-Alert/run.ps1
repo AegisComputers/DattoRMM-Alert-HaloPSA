@@ -154,10 +154,7 @@ if ($Email) {
 
     Write-Host $HaloTicketCreate
 
-    $HaloTicketCreate | foreach-object {
-        Write-host $_
-    } 
-    
+    Write-Host $HaloTicketCreate.GetEnumerator()  
 
 } else {
     Write-Host "No alert found"
