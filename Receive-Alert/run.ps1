@@ -42,7 +42,7 @@ Write-Host $FullRequest
 Write-Host $AlertWebhook
 
 
-$Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
+$Email = Get-AlertEmailBody -AlertWebhook $FullRequest
 
 if ($Email) {
     $Alert = $Email.Alert
