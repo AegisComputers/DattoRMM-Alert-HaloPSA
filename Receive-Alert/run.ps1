@@ -154,13 +154,11 @@ if ($Email) {
 
     } 
 
-    $existingTID = ((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id
-    
     Write-Host "Existing ID Below"
-    Write-host  $existingTID
+    Write-host  (((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id)
     
-    if ($null -ne $existingTID) {
-        $ticketData = get-haloticket -ticketid $existingid
+    if ($null -ne (((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id)) {
+        $ticketData = get-haloticket -ticketid (((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id)
         Write-Host $Request.Body.resolvedAlert
         if ($Request.Body.resolvedAlert -eq "true") { 
             $ticketdata.status_id = 28
