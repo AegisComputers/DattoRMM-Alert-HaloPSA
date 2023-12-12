@@ -103,7 +103,7 @@ if ($Email) {
         details_html     = $HtmlBody
         gfialerttype     = $AlertID
         DattoAlertState = 0
-        site_id          = $HaloDevice.dsite
+        site_id          = 291
         assets           = @(@{id = $HaloDevice.did })
         priority_id      = $HaloPriority
         status_id        = $HaloTicketStatusID
