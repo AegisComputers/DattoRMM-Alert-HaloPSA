@@ -165,15 +165,15 @@ function Get-HTMLBody {
       body,table,td{font-family:Helvetica,Arial,sans-serif !important}.ExternalClass{width:100%}.ExternalClass,.ExternalClass p,.ExternalClass span,.ExternalClass font,.ExternalClass td,.ExternalClass div{line-height:150%}a{text-decoration:none}*{color:inherit}a[x-apple-data-detectors],u+#body a,#MessageViewBody a{color:inherit;text-decoration:none;font-size:inherit;font-family:inherit;font-weight:inherit;line-height:inherit}img{-ms-interpolation-mode:bicubic}table:not([class^=s-]){font-family:Helvetica,Arial,sans-serif;mso-table-lspace:0pt;mso-table-rspace:0pt;border-spacing:0px;border-collapse:collapse}table:not([class^=s-]) td{border-spacing:0px;border-collapse:collapse}@media screen and (max-width: 1800px){.row-responsive.row{margin-right:0 !important}td.col-lg-4{display:block;width:100% !important;padding-left:0 !important;padding-right:0 !important}.max-w-96,.max-w-96>tbody>tr>td{max-width:1800px !important;width:100% !important}.w-full,.w-full>tbody>tr>td{width:100% !important}*[class*=s-lg-]>tbody>tr>td{font-size:0 !important;line-height:0 !important;height:0 !important}.s-10>tbody>tr>td{font-size:40px !important;line-height:40px !important;height:40px !important}}
     </style>
   </head>
-  <body style="outline: 0; width: 100%; min-width: 100%; height: 100%; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: Helvetica, Arial, sans-serif; line-height: 24px; font-weight: normal; font-size: 16px; -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box; color: #000000; margin: 0; padding: 0; border-width: 0;" bgcolor="#ffffff">
-    <table class="body" valign="top" role="presentation" border="0" cellpadding="0" cellspacing="0" style="outline: 0; width: 100%; min-width: 100%; height: 100%; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: Helvetica, Arial, sans-serif; line-height: 24px; font-weight: normal; font-size: 16px; -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box; color: #000000; margin: 0; padding: 0; border-width: 0;" bgcolor="#ffffff">
+  <body style="outline: 0; width: 100%; min-width: 100%; height: 100%; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: Helvetica, Arial, sans-serif; line-height: 24px; font-weight: normal; font-size: 16px; -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box; color: #333333; margin: 0; padding: 0; border-width: 0;" bgcolor="#ffffff">
+    <table class="body" valign="top" role="presentation" border="0" cellpadding="0" cellspacing="0" style="outline: 0; width: 100%; min-width: 100%; height: 100%; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: Helvetica, Arial, sans-serif; line-height: 24px; font-weight: normal; font-size: 16px; -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box; color: #333333; margin: 0; padding: 0; border-width: 0;" bgcolor="#ffffff">
       <tbody style="width: 100%; max-width: 1800px; margin: 0 auto;">
         <tr>
           <td valign="top" style="line-height: 24px; font-size: 16px; margin: 0;" align="left">
-            <table class="bg-black w-full" role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%;" bgcolor="#000000" width="100%">
+            <table class="bg-black w-full" role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%;" bgcolor="#333333" width="100%">
               <tbody style="width: 100%; max-width: 1800px; margin: 0 auto;">
                 <tr>
-                  <td style="line-height: 24px; font-size: 16px; width: 100%; margin: 0;" align="left" bgcolor="#000000" width="100%">
+                  <td style="line-height: 24px; font-size: 16px; width: 100%; margin: 0;" align="left" bgcolor="#333333" width="100%">
                     <table class="container" role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 1800px;">
                       <tbody style="width: 100%; max-width: 1800px; margin: 0 auto;">
                         <tr>
@@ -246,7 +246,7 @@ function Get-HTMLBody {
         $Block = @"
     <!-- Block HTML Start -->
     <td class="col-lg-4"
-        style="line-height: 24px; font-size: 16px; min-height: 1px; font-weight: normal; padding:24px; width: $CalculatedWidth%; margin: 0; background-color:#222222; border-left: 20px solid #000000; border-right: 20px solid #000000; border-top: 20px solid #000000;"
+        style="line-height: 24px; font-size: 16px; min-height: 1px; font-weight: normal; padding:24px; width: $CalculatedWidth%; margin: 0; background-color:#222222; border-left: 20px solid #333333; border-right: 20px solid #333333; border-top: 20px solid #333333;"
         align="left" valign="top">
         <table width="100%"class="ax-center" role="presentation" align="center" border="0" cellpadding="0" cellspacing="0"
             style="margin: 0 auto;">
