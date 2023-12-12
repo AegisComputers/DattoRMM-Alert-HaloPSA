@@ -37,7 +37,7 @@ function Get-DRMMAlertDetailsSection {
 <div style="display:inline-block; margin: 2px; max-width: 128px; min-width:100px; vertical-align:top; width:100%;"
     class="stack-column">
     <a class="button-a button-a-primary" target="_blank" href="$AlertDocumentationURL"
-        style="background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
+        style="background: #333333; border: 1px solid #333333; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
         Docs</a>
 </div>
 "@
@@ -72,28 +72,28 @@ function Get-DRMMAlertDetailsSection {
                 class="stack-column">
                 <a class="button-a button-a-primary" target="_blank"
                     href="https://$($DattoPlatform)rmm.centrastage.net/alert/$($Alert.alertUid)"
-                    style="background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
+                    style="background: #333333; border: 1px solid #333333; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
                     Alert</a>
             </div>
             <div style="display:inline-block; margin: 2px; max-width: 128px; min-width:100px; vertical-align:top; width:100%;"
                 class="stack-column">
                 <a class="button-a button-a-primary" target="_blank"
                     href="https://$($DattoPlatform)rmm.centrastage.net/device/$($Device.id)/$($Device.hostname)"
-                    style="background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
+                    style="background: #333333; border: 1px solid #333333; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
                     Device</a>
             </div>
             <div style="display:inline-block; margin: 2px; max-width: 128px; min-width:100px; vertical-align:top; width:100%;"
                 class="stack-column">
                 <a class="button-a button-a-primary" target="_blank"
                     href="https://$($DattoPlatform)rmm.centrastage.net/site/$($Device.siteId)"
-                    style="background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
+                    style="background: #333333; border: 1px solid #333333; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">View
                     Site</a>
             </div>
             <div style="display:inline-block; margin: 2px; max-width: 128px; min-width:100px; vertical-align:top; width:100%;"
                 class="stack-column">
                 <a class="button-a button-a-primary" target="_blank"
                     href="https://$($DattoPlatform).centrastage.net/csm/remote/rto/$($Device.id)"
-                    style="background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">Web
+                    style="background: #333333; border: 1px solid #333333; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;">Web
                     Remote</a>
             </div>
         </td>
@@ -304,7 +304,7 @@ function Get-DRMMAlertHistorySection {
     $HTMLHeatmapTable = Get-Heatmap -InputData $ParsedDates -XValues $XValues -YValues $YValues
 
 
-    $ParsedOpenAlerts = $DeviceOpenAlerts | select-object @{n = 'View'; e = { "<a class=`"button-a button-a-primary`" target=`"_blank`" href=`"https://$($DattoPlatform)rmm.centrastage.net/alert/$($_.alertUid)`" style=`"background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;`">View</a>" } },
+    $ParsedOpenAlerts = $DeviceOpenAlerts | select-object @{n = 'View'; e = { "<a class=`"button-a button-a-primary`" target=`"_blank`" href=`"https://$($DattoPlatform)rmm.centrastage.net/alert/$($_.alertUid)`" style=`"background: #333333; border: 1px solid #333333; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;`">View</a>" } },
     @{n = 'Priority'; e = { $_.priority } },
     @{n = 'Created'; e = { $([datetime]$origin = '1970-01-01 00:00:00'; $origin.AddMilliSeconds($_.timestamp)) } },
     @{n = 'Type'; e = { $AlertTypesLookup[$_.alertContext.'@class'] } },
@@ -313,7 +313,7 @@ function Get-DRMMAlertHistorySection {
     $HTMLOpenAlerts = $ParsedOpenAlerts | Sort-Object Created -desc | convertto-html -Fragment
     $HTMLParsedOpenAlerts = [System.Web.HttpUtility]::HtmlDecode(((($HTMLOpenAlerts) -replace '<table>', $AlertsTableStyle) -replace '<td>', $AlertsTableTDStyle))
 
-    $ParsedResolvedAlerts = $DeviceResolvedAlerts | select-object @{n = 'View'; e = { "<a class=`"button-a button-a-primary`" target=`"_blank`" href=`"https://$($DattoPlatform)rmm.centrastage.net/alert/$($_.alertUid)`" style=`"background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;`">View</a>" } },
+    $ParsedResolvedAlerts = $DeviceResolvedAlerts | select-object @{n = 'View'; e = { "<a class=`"button-a button-a-primary`" target=`"_blank`" href=`"https://$($DattoPlatform)rmm.centrastage.net/alert/$($_.alertUid)`" style=`"background: #333333; border: 1px solid #333333; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;`">View</a>" } },
     @{n = 'Priority'; e = { $_.priority } },
     @{n = 'Created'; e = { $([datetime]$origin = '1970-01-01 00:00:00'; $origin.AddMilliSeconds($_.timestamp)) } },
     @{n = 'Type'; e = { $AlertTypesLookup[$_.alertContext.'@class'] } },
