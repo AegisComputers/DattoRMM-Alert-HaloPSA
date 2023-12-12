@@ -155,6 +155,7 @@ if ($Email) {
     } 
 
     $existingID = ((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id
+    Write-Host "Existing ID Below"
     Write-host $existingID
     if ($null -ne $existingID) {
         $ticketData = get-haloticket -ticketid $existingid
@@ -165,6 +166,7 @@ if ($Email) {
             Set-HaloTicket -Ticket $ticketData
         }
     } else {
+        Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
     }
 
