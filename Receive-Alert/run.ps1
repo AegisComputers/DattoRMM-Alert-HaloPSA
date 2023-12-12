@@ -152,24 +152,11 @@ if ($Email) {
      
     $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 
-    $ActionUpdate = @{
-        id                = 1
-        ticket_id         = $Ticket.id
-        important         = $true
-        action_isresponse = $true      
-    }
+    Write-Host $HaloTicketCreate
 
-    $Null = Set-HaloAction -Action $ActionUpdate
-
-    if ($SetTicketResponded -eq $true) {
-        $ActionResolveUpdate = @{
-            ticket_id         = $Ticket.id
-            action_isresponse = $true
-            validate_response = $True
-            sendemail         = $false
-        }
-        $Null = New-HaloAction -Action $ActionResolveUpdate
-    }
+    $HaloTicketCreate | for-eachobject {
+        Write-host $_
+    } 
     
 
 } else {
