@@ -152,11 +152,7 @@ if ($Email) {
      
     $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 
-    Write-Host $HaloTicketCreate
-
-    Write-Host $HaloTicketCreate.GetEnumerator()  
-
-    Write-Host $HaloTicketCreate | ConvertTo-Json -Compress
+    $HaloTicketCreate | Out-String | Write-Host
 
 } else {
     Write-Host "No alert found"
