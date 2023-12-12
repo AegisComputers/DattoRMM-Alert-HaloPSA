@@ -154,7 +154,7 @@ if ($Email) {
 
     Write-Host $HaloTicketCreate
 
-    $HaloTicketCreate | for-eachobject {
+    $HaloTicketCreate | foreach-object {
         Write-host $_
     } 
     
