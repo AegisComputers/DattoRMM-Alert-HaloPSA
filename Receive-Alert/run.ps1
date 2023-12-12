@@ -154,10 +154,8 @@ if ($Email) {
 
     } 
 
-    $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly -TicketIDOnly
+    $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly #-TicketIDOnly
     $ticketidHalo = $TicketidGet.id
-
-    Write-Host $ticketidHalo
 
     if ($Request.Body.resolvedAlert -eq "true") {
         Write-Host "Resolved Closing $ticketidHalo"
@@ -178,7 +176,7 @@ if ($Email) {
     $HaloTicketCreate | Out-String | Write-Host
 
 } else {
-    Write-Host "No alert found"
+        Write-Host "No alert found"
 }
 
 
