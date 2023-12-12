@@ -154,8 +154,22 @@ if ($Email) {
 
     } 
 
+    $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly -TicketIDOnly
+    $ticketidHalo = $TicketidGet.id
+
+    Write-Host $ticketidHalo
+
     if ($Request.Body.resolvedAlert -eq "true") {
-        Write-Host "Resolved Closing"
+        Write-Host "Resolved Closing $ticketidHalo"
+
+        $TicketID = $ticketidHalo
+
+        $TicketUpdate = @{
+            id        = $TicketID 
+            status_id = 28
+            agent_id  = 38
+        }
+        $null = Set-HaloTicket -Ticket $TicketUpdate
     } else {
         Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
