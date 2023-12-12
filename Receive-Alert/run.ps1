@@ -154,17 +154,8 @@ if ($Email) {
 
     } 
 
-    Write-Host "Existing ID Below"
-    Write-host  (((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id)
-    
-    if ($null -ne (((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id)) {
-        $ticketData = get-haloticket -ticketid (((Get-HaloTicket -Category1 145 -FullObjects -OpenOnly) | Where-Object {(($_.customfields.id -eq 106) -and ($_.customfields.value -eq $alertUID)) }).id)
-        Write-Host $Request.Body.resolvedAlert
-        if ($Request.Body.resolvedAlert -eq "true") { 
-            $ticketdata.status_id = 28
-            $ticketdata.agent_id = 38
-            Set-HaloTicket -Ticket $ticketData
-        }
+    if ($Request.Body.resolvedAlert -eq "true") {
+        Write-Host "Resolved Closing"
     } else {
         Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
