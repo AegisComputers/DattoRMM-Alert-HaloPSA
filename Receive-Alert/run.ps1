@@ -3,9 +3,7 @@ using namespace System.Net
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
 
-$FullRequest = $Request.Body | ConvertTo-Json | ConvertFrom-Json
-
-Write-Host "Processing Webhook for Alert $($Request.Body.alertUID)"
+Write-Host "Processing Webhook for Alert - $($Request.Body.alertUID) -"
 
 $HaloClientID = $env:HaloClientID
 $HaloClientSecret = $env:HaloClientSecret
@@ -35,16 +33,9 @@ $PriorityHaloMap = @{
     "Information" = "4"
 }
 
-#$AlertWebhook = $Request.Body | convertfrom-json -depth 100
-$AlertWebhook = $FullRequest | ConvertTo-Json
+$AlertWebhook = $Request.Body # | ConvertTo-Json -Depth 100
 
-Write-Host $FullRequest
-Write-Host $AlertWebhook
-
-
-$Email = Get-AlertEmailBody -AlertWebhook $FullRequest
-
-Write-Host $Email
+$Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
 
 if ($Email) {
     $Alert = $Email.Alert
@@ -53,11 +44,11 @@ if ($Email) {
     
     $HaloDeviceReport = @{
         name                    = "Datto RMM Improved Alerts PowerShell Function - Device Report"
-        sql                     = "Select did, Dsite, DDattoID, DDattoAlternateId, dinvno, dtype from device"
+        sql                     = "Select did, Dsite, DDattoID, DDattoAlternateId from device"
         description             = "This report is used to quickly obtain device mapping information for use with the improved Datto RMM Alerts Function"
         type                    = 0
         datasource_id           = 0
-        canbeaccessedbyallusers = $true
+        canbeaccessedbyallusers = $false
     }
 
     $ParsedAlertType = Get-AlertHaloType -Alert $Alert -AlertMessage $AlertWebhook.alertMessage
@@ -79,35 +70,31 @@ if ($Email) {
         id                       = $HaloAlertsReport.id
         filters                  = @(
             @{
-                fieldname        = 'inventorynumber'
-                stringruletype   = 2
-                stringruletext   = "$($HaloDevice.dinvno)"
+                fieldname      = 'inventorynumber'
+                stringruletype = 2
+                stringruletext = "$($HaloDevice.did)"
             }
         )
-        reportingperiodstartdate = Get-Date(((Get-Date).ToUniversalTime()).adddays(-$HaloAlertHistoryDays)) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
-        reportingperiodenddate   = Get-Date((Get-Date -Hour 23 -Minute 59 -second 59).ToUniversalTime()) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
+        _loadreportonly          = $true
+        reportingperiodstartdate = get-date(((Get-date).ToUniversalTime()).adddays(-$HaloAlertHistoryDays)) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
+        reportingperiodenddate   = get-date((Get-date -Hour 23 -Minute 59 -second 59).ToUniversalTime()) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
         reportingperioddatefield = "dateoccured"
         reportingperiod          = "7"
     }
+
+    $ReportResults = (Set-HaloReport -Report $AlertReportFilter).report.rows
+
+    $ReoccuringHistory = $ReportResults | where-object { $_.CFDattoAlertType -eq $ParsedAlertType } 
     
-    Set-HaloReport -Report $AlertReportFilter -InformationAction SilentlyContinue
+    $ReoccuringAlerts = $ReoccuringHistory | where-object { $_.dateoccured -gt ((Get-Date).addhours(-$ReoccurringTicketHours)) }
 
-    $GetReportResults = Get-HaloReport -ReportID $AlertReportFilter.id -IncludeDetails -LoadReport
-
-    $ReportResults = $GetReportResults.report.rows
-
-    $ReoccuringHistory = $ReportResults | Where-Object -Filter { $_.CFDattoAlertType -eq $ParsedAlertType }
-    
-    $ReoccuringAlerts = $ReoccuringHistory | Where-Object { $_.dateoccured -gt ((Get-Date).addhours(-$ReoccurringTicketHours)) }
-
-    $RelatedAlerts = $ReportResults | Where-Object { $_.dateoccured -gt ((Get-Date).addminutes(-$RelatedAlertMinutes)).ToUniversalTime() -and $_.CFDattoAlertType -ne $ParsedAlertType }
+    $RelatedAlerts = $ReportResults | where-object { $_.dateoccured -gt ((Get-Date).addminutes(-$RelatedAlertMinutes)).ToUniversalTime() -and $_.CFDattoAlertType -ne $ParsedAlertType }
         
     $TicketSubject = $Email.Subject
 
     $HTMLBody = $Email.Body
 
     $HaloPriority = $PriorityHaloMap."$($Alert.Priority)"
-
 
     $HaloTicketCreate = @{
         summary          = $TicketSubject
@@ -128,8 +115,7 @@ if ($Email) {
         )
     }
 
-    Write-Host $HaloTicketCreate
-    
+
     # Handle reoccurring alerts
     if ($ReoccuringAlerts) {        
         $ReoccuringAlertParent = $ReoccuringAlerts | Sort-Object FaultID | Select-Object -First 1
