@@ -98,10 +98,8 @@ if ($Email) {
 
     $HaloTicketCreate = @{
         summary          = $TicketSubject
-        tickettype_id    = $HaloTicketType
-        inventory_number = $HaloDevice.did
+        tickettype_id    = 8
         details_html     = $HtmlBody
-        gfialerttype     = $AlertID
         DattoAlertState = 0
         site_id          = 291
         assets           = @(@{id = $HaloDevice.did })
