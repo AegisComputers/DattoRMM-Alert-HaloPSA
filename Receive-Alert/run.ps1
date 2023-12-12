@@ -38,6 +38,9 @@ $PriorityHaloMap = @{
 #$AlertWebhook = $Request.Body | convertfrom-json -depth 100
 $AlertWebhook = $FullRequest | ConvertTo-Json
 
+Write-Host $FullRequest
+Write-Host $AlertWebhook
+
 
 $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
 
