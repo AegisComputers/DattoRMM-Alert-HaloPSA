@@ -192,7 +192,10 @@ if ($Email) {
             validate_response = $false
             sendemail         = $false
         }
-        $Null = New-HaloAction -Action $ActionUpdate
+
+        Write-Host "Adding ticket entry $ActionUpdate"
+        
+        #$Null = New-HaloAction -Action $ActionUpdate
 
         $TicketUpdate = @{
             id        = $TicketID 
