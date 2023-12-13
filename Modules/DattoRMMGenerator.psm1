@@ -53,8 +53,9 @@ function Get-DRMMAlertDetailsSection {
         <td style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #ffffff;">
             <h1
                 style="margin: 0 0 10px; font-size: 25px; line-height: 30px; font-weight: normal; $Colour">
-                $($Alert.priority) Alert - $($Device.siteName) - $($Device.hostname)</h1>
-            <h3>Component Monitor - [Failure Test Monitor] - Result: A Test Alert Was Created:</h3>
+                $($Alert.priority) Alert - Site: $($Device.siteName) - Device: $($Device.hostname)</h1>
+            <br />
+            <h3>Alert Message:</h3>
             <p style="margin: 0 0 10px;">$(Get-AlertDescription -Alert $Alert)
             $($Alert.diagnostics)
             </p>
