@@ -182,8 +182,8 @@ if ($Email) {
                 actionid          = 23
                 outcome           = "Remote"
                 note              = "Resolved by Datto Automation"
-                #actionarrivaldate = $dateArrival
-                #actioncompletiondate = $dateEnd
+                actionarrivaldate = $dateArrival
+                actioncompletiondate = $dateEnd
                 action_isresponse = $false
                 validate_response = $false
                 sendemail         = $false
