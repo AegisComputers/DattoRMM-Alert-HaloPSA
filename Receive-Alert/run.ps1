@@ -99,12 +99,14 @@ if ($Email) {
 
     $HaloPriority = $PriorityHaloMap."$($Alert.Priority)"
 
+    $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($Request.Body.dattoSiteDetails)
+
     $HaloTicketCreate = @{
         summary          = $TicketSubject
         tickettype_id    = 8
         details_html     = $HtmlBody
         DattoAlertState = 0
-        site_id          = 286
+        site_id          = $HaloSiteIDDatto
         assets           = @(@{id = $HaloDevice.did })
         priority_id      = $HaloPriority
         status_id        = $HaloTicketStatusID
