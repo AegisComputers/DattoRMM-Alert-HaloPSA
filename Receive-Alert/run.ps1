@@ -158,7 +158,7 @@ if ($Email) {
     $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly -FullObjects
 
     # The UID you are looking for
-    $targetUID = "d001df5e-ed49-4077-9479-fa7e3d08b121"
+    $targetUID = $Request.Body.alertUID #"d001df5e-ed49-4077-9479-fa7e3d08b121"
 
     # Iterate over each ticket in the result
     foreach ($ticket in $TicketidGet) {
