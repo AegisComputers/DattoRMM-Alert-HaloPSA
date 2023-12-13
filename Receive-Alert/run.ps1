@@ -154,9 +154,28 @@ if ($Email) {
 
     } 
 
-    $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly #-TicketIDOnly
-    $ticketidHalo = $TicketidGet.id
+    # Your command to get tickets
+    $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly -FullObjects
 
+    # The UID you are looking for
+    $targetUID = "d001df5e-ed49-4077-9479-fa7e3d08b121"
+
+    # Iterate over each ticket in the result
+    foreach ($ticket in $TicketidGet) {
+        # Access the custom fields
+        $customFields = $ticket.customfields
+
+        # Find the field with name 'CFDattoAlertUID'
+        $dattoAlertUIDField = $customFields | Where-Object { $_.name -eq 'CFDattoAlertUID' }
+
+        # Check if the value of this field matches the target UID
+        if ($dattoAlertUIDField -and $dattoAlertUIDField.value -eq $targetUID) {
+            # Output the matching ticket ID
+            Write-Output "Found matching ticket: ID is $($ticket.id)"
+            $ticketidHalo = $ticket.id
+        }
+    }
+    
     if ($Request.Body.resolvedAlert -eq "true") {
         Write-Host "Resolved Closing $ticketidHalo"
 
@@ -167,7 +186,7 @@ if ($Email) {
             status_id = 28
             agent_id  = 38
         }
-        $null = Set-HaloTicket -Ticket $TicketUpdate
+        #$null = Set-HaloTicket -Ticket $TicketUpdate
     } else {
         Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
