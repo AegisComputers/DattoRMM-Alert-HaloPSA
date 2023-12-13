@@ -32,7 +32,7 @@ function Find-DattoAlertHaloSite {
     $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
     $DattoSite = $dataSiteDetails[0] 
     $DattoCustomer = $dataSiteDetails[1] 
-    $HaloClientID = (Get-HaloClient -Search $DattoCustomer).id
+    $HaloClientID = (Get-HaloClient -Search $DattoCustomer)[0].id
     #Does <site> exist in Halo if not select <Customer> and select the first ID
     if ($SiteInfo = Get-HaloSite -Search $dattosite -ClientID $HaloClientID) {
         Write-Host "Found Site with Client id of $($HaloClientID)"
