@@ -181,6 +181,19 @@ if ($Email) {
 
         $TicketID = $ticketidHalo
 
+        $ActionUpdate = @{
+            ticket_id         = $TicketID 
+            actionid          = 23
+            outcome           = "Remote"
+            note              = "Resolved by Datto Automation"
+            actionarrivaldate = (get-date((get-date).AddMinutes(-30)))
+            actioncompletiondate = (get-date) 
+            action_isresponse = $false
+            validate_response = $false
+            sendemail         = $false
+        }
+        $Null = New-HaloAction -Action $ActionUpdate
+
         $TicketUpdate = @{
             id        = $TicketID 
             status_id = 28
