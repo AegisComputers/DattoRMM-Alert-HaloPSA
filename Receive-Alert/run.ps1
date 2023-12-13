@@ -186,7 +186,7 @@ if ($Email) {
             status_id = 28
             agent_id  = 38
         }
-        #$null = Set-HaloTicket -Ticket $TicketUpdate
+        $null = Set-HaloTicket -Ticket $TicketUpdate
     } else {
         Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
