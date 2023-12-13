@@ -175,7 +175,7 @@ if ($Email) {
             $ticketidHalo = $ticket.id
             $dateArrival = (get-date((get-date).AddMinutes(-30)))
             $dateEnd = (get-date) 
-            Write-Output "Date Arrival $($dateArrival) and end $($$dateEnd)"
+            Write-Output "Date Arrival $($dateArrival) and end $($dateEnd)"
             
             $ActionUpdate = @{
                 ticket_id         = $ticket.id
