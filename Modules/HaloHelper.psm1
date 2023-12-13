@@ -21,3 +21,35 @@ function Invoke-HaloReport {
 	
 	return $HaloResults
 }
+
+function Find-DattoAlertHaloSite {
+    param (
+        $DattoSiteName
+    )
+    $dattoLookupString = $DattoSiteName
+
+    #Process based on naming scheme in Datto <site>(<Customer>)
+    $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
+    $DattoSite = $dataSiteDetails[0] 
+    $DattoCustomer = $dataSiteDetails[1] 
+    $HaloClientID = (Get-HaloClient -Search $DattoCustomer).id
+    #Does <site> exist in Halo if not select <Customer> and select the first ID
+    if ($SiteInfo = Get-HaloSite -Search $dattosite -ClientID $HaloClientID) {
+        Write-Host "Found Site with Client id of $($HaloClientID)"
+        $HaloSiteID = $SiteInfo.id 
+    } elseif ($SiteInfo = Get-HaloSite -Search $DattoCustomer) {
+        Write-Host "No Site found defaulting to Customer for site lookup. Will Map to Site named : Head Office IF existing"
+        if ($siteDrillD = ($siteinfo | Where-Object {$_.ClientSite_Name -match "Head Office"})) {
+            Write-Host "Head Office found"
+            $HaloSiteID = $siteDrillD.id
+        } else {
+            Write-Host "Head Office not found. Defaulting to first created site"
+            $HaloSiteID = $SiteInfo[0].id
+        }
+    } else {
+        Write-Host "No Valid Site or Customer Found Setting to Aegis Internal"
+    }
+    Write-Host "Selected Site Id of $($HaloSiteID)"
+
+    return $HaloSiteID
+}
