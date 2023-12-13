@@ -48,6 +48,7 @@ function Find-DattoAlertHaloSite {
         }
     } else {
         Write-Host "No Valid Site or Customer Found Setting to Aegis Internal"
+	$HaloSiteID = 286
     }
     Write-Host "Selected Site Id of $($HaloSiteID)"
 
