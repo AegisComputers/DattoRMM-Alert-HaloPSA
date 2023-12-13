@@ -173,6 +173,20 @@ if ($Email) {
             # Output the matching ticket ID
             Write-Output "Found matching ticket: ID is $($ticket.id)"
             $ticketidHalo = $ticket.id
+            
+            $ActionUpdate = @{
+                ticket_id         = $ticketidHalo
+                actionid          = 23
+                outcome           = "Remote"
+                note              = "Resolved by Datto Automation"
+                #actionarrivaldate = (get-date((get-date).AddMinutes(-30)))
+                #actioncompletiondate = (get-date) 
+                action_isresponse = $false
+                validate_response = $false
+                sendemail         = $false
+            }
+            $Null = New-HaloAction -Action $ActionUpdate
+            Write-Host "Adding ticket entry $ActionUpdate"
         }
     }
     
@@ -180,22 +194,7 @@ if ($Email) {
         Write-Host "Resolved Closing $ticketidHalo"
 
         $TicketID = $ticketidHalo
-
-        $ActionUpdate = @{
-            ticket_id         = $ticketidHalo
-            actionid          = 23
-            outcome           = "Remote"
-            note              = "Resolved by Datto Automation"
-            #actionarrivaldate = (get-date((get-date).AddMinutes(-30)))
-            #actioncompletiondate = (get-date) 
-            action_isresponse = $false
-            validate_response = $false
-            sendemail         = $false
-        }
-        $Null = New-HaloAction -Action $ActionUpdate
-        Write-Host "Adding ticket entry $ActionUpdate"
         
-
         $TicketUpdate = @{
             id        = $TicketID 
             status_id = 28
