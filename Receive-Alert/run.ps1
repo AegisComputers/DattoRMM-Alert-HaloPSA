@@ -173,14 +173,17 @@ if ($Email) {
             # Output the matching ticket ID
             Write-Output "Found matching ticket: ID is $($ticket.id)"
             $ticketidHalo = $ticket.id
+            $dateArrival = (get-date((get-date).AddMinutes(-30)))
+            $dateEnd = (get-date) 
+            Write-Output "Date Arrival $($dateArrival) and end $($$dateEnd)"
             
             $ActionUpdate = @{
-                ticket_id         = $ticketidHalo
+                ticket_id         = $ticket.id
                 actionid          = 23
                 outcome           = "Remote"
                 note              = "Resolved by Datto Automation"
-                #actionarrivaldate = (get-date((get-date).AddMinutes(-30)))
-                #actioncompletiondate = (get-date) 
+                #actionarrivaldate = $dateArrival
+                #actioncompletiondate = $dateEnd
                 action_isresponse = $false
                 validate_response = $false
                 sendemail         = $false
