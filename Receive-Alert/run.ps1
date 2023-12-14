@@ -101,7 +101,12 @@ if ($Email) {
 
     $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($Request.Body.dattoSiteDetails)
 
+    Write-Host ($Request.Body.dattoSiteDetails)
+
     $HaloClientDattoMatch = Find-DattoAlertHaloClient -DattoSiteName ($Request.Body.dattoSiteDetails)
+
+    Write-Host $HaloClientDattoMatch
+    
     $Contracts = (Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects)
 
     $FilteredContracts = $Contracts | Where-Object {
