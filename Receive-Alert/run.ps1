@@ -113,7 +113,7 @@ if ($Email) {
 
     $HaloClientDattoMatch = $HaloClientID
     
-    Write-Host $HaloClientDattoMatch
+    Write-Host "Client ID in Halo $($HaloClientDattoMatch)"
     
     $Contracts = (Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects)
 
