@@ -111,8 +111,12 @@ if ($Email) {
     # Sort the filtered contracts by 'start_date' in descending order
     $LatestContract = $FilteredContracts | Sort-Object start_date -Descending | Select-Object -First 1
 
+    Write-Host $LatestContract
+
     # Extract and display the ID of the latest contract based on the start date
     $LatestContractId = $LatestContract.id
+
+    Write-Host $LatestContract.id
 
     $HaloTicketCreate = @{
         summary          = $TicketSubject
