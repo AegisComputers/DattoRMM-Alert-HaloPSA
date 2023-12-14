@@ -117,6 +117,8 @@ if ($Email) {
     
     $Contracts = (Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects)
 
+    Write-Host "Contracts for client ID are $($Contracts)"
+
     $FilteredContracts = $Contracts | Where-Object {
         $_.ref -like '*M' -and $_.site_id -eq $HaloSiteIDDatto
     }
