@@ -101,6 +101,19 @@ if ($Email) {
 
     $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($Request.Body.dattoSiteDetails)
 
+    $HaloClientDattoMatch = Find-DattoAlertHaloClient -DattoSiteName ($Request.Body.dattoSiteDetails)
+    $Contracts = (Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects)
+
+    $FilteredContracts = $Contracts | Where-Object {
+        $_.ref -like '*M' -and $_.site_id -eq $HaloSiteIDDatto
+    }
+
+    # Sort the filtered contracts by 'start_date' in descending order
+    $LatestContract = $FilteredContracts | Sort-Object start_date -Descending | Select-Object -First 1
+
+    # Extract and display the ID of the latest contract based on the start date
+    $LatestContractId = $LatestContract.id
+
     $HaloTicketCreate = @{
         summary          = $TicketSubject
         tickettype_id    = 8
@@ -111,6 +124,7 @@ if ($Email) {
         priority_id      = $HaloPriority
         status_id        = $HaloTicketStatusID
         category_1       = "Datto Alert"
+        contract_id      = $LatestContractId
         customfields     = @(
             @{
                 id    = $HaloCustomAlertTypeField
