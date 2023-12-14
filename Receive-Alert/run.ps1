@@ -103,7 +103,7 @@ if ($Email) {
 
     Write-Host ($Request.Body.dattoSiteDetails)
 
-    $dattoLookupString = $Request.Body.dattoSiteDetail
+    $dattoLookupString = $Request.Body.dattoSiteDetails
 
     #Process based on naming scheme in Datto <site>(<Customer>)
     $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
