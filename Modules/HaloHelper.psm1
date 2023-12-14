@@ -54,3 +54,21 @@ function Find-DattoAlertHaloSite {
 
     return $HaloSiteID
 }
+
+function Find-DattoAlertHaloClient {
+    param (
+        $DattoSiteName
+    )
+    $dattoLookupString = $DattoSiteName
+
+    #Process based on naming scheme in Datto <site>(<Customer>)
+    $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
+    #$DattoSite = $dataSiteDetails[0] 
+    $DattoCustomer = $dataSiteDetails[1] 
+    $HaloClientID = (Get-HaloClient -Search $DattoCustomer)[0].id
+    #Does <site> exist in Halo if not select <Customer> and select the first ID
+
+    Write-Host "Selected Client Id of $($HaloClientID)"
+
+    return $HaloClientID
+}
