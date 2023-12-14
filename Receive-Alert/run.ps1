@@ -103,8 +103,16 @@ if ($Email) {
 
     Write-Host ($Request.Body.dattoSiteDetails)
 
-    $HaloClientDattoMatch = Find-DattoAlertHaloClient -DattoSiteName ($Request.Body.dattoSiteDetails)
+    $dattoLookupString = $Request.Body.dattoSiteDetail
 
+    #Process based on naming scheme in Datto <site>(<Customer>)
+    $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
+    #$DattoSite = $dataSiteDetails[0] 
+    $DattoCustomer = $dataSiteDetails[1] 
+    $HaloClientID = (Get-HaloClient -Search $DattoCustomer)[0].id
+
+    $HaloClientDattoMatch = $HaloClientID
+    
     Write-Host $HaloClientDattoMatch
     
     $Contracts = (Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects)
