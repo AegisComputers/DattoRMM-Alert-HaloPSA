@@ -217,6 +217,7 @@ if ($Email) {
                 ticket_id         = $ticket.id
                 actionid          = 23
                 outcome           = "Remote"
+                outcome_id        = 23
                 note              = "Resolved by Datto Automation"
                 actionarrivaldate = $dateArrival
                 actioncompletiondate = $dateEnd
