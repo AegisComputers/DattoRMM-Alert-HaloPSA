@@ -243,10 +243,36 @@ if ($Email) {
         
         $TicketUpdate = @{
             id        = $TicketID 
-            status_id = 28
+            status_id = 9
             agent_id  = 38
         }
         $null = Set-HaloTicket -Ticket $TicketUpdate
+
+        Start-Sleep -Seconds 1
+
+        $Actions = Get-HaloAction -TicketID $TicketID
+
+        # Mass review logic
+        foreach ($action in $actions) {
+           $ReviewData = @{
+               ticket_id = $action.ticket_id
+               id = $action.id
+               actreviewed = "true"
+            }
+            Set-HaloAction -Action $ReviewData
+        }
+        
+        Start-Sleep -Seconds 1
+
+        $dateInvoice = (get-date)
+        $invoice = @{ 
+            client_id = $HaloClientDattoMatch
+            invoice_date = $dateInvoice
+            lines = @(@{entity_type = "labour";ticket_id = $TicketID})
+        }
+
+        New-HaloInvoice -Invoice $invoice 
+        
     } else {
         Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
