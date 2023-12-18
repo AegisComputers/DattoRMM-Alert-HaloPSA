@@ -99,9 +99,13 @@ if ($Email) {
 
     $HaloPriority = $PriorityHaloMap."$($Alert.Priority)"
 
-    $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($Request.Body.dattoSiteDetails)
+    $RSiteDetails = $Request.Body.dattoSiteDetails
 
-    Write-Host ($Request.Body.dattoSiteDetails)
+    Start-Sleep -Seconds 15
+
+    $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
+
+    Write-Host ($RSiteDetails)
 
     $dattoLookupString = $Request.Body.dattoSiteDetails
 
@@ -229,6 +233,8 @@ if ($Email) {
             Write-Host "Adding ticket entry $ActionUpdate"
         }
     }
+
+    Start-Sleep -Seconds 15
     
     if ($Request.Body.resolvedAlert -eq "true") {
         Write-Host "Resolved Closing $ticketidHalo"
