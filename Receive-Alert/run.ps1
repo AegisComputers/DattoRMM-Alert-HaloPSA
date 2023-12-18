@@ -209,7 +209,7 @@ if ($Email) {
             # Output the matching ticket ID
             Write-Output "Found matching ticket: ID is $($ticket.id)"
             $ticketidHalo = $ticket.id
-            $dateArrival = (get-date((get-date).AddMinutes(-30)))
+            $dateArrival = (get-date((get-date).AddMinutes(-5)))
             $dateEnd = (get-date) 
             Write-Output "Date Arrival $($dateArrival) and end $($dateEnd)"
             
