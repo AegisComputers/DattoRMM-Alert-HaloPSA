@@ -1,8 +1,17 @@
 function GetUserEmail {
     param (
-        $Username
+        $Username,
+        $ClientId
     )
     #Get Email address based on provided username. 
+
+    $address = (Get-HaloUser -Search $username -ClientID $ClientId).emailaddress
+
+    if ($null -eq $address) {
+        return $false
+    } else { 
+        return $address
+    }
     
 }
 
