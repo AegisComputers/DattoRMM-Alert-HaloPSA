@@ -1,11 +1,11 @@
 #
-# Module manifest for the 'HaloHelper' module
+# Module manifest for the 'EmailHelper' module
 #
 
 @{
 
 # Script module file associated with this manifest.
-RootModule = 'HaloHelper.psm1'
+RootModule = 'EmailHelper.psm1'
 
 # Version number of this module.
 ModuleVersion = '1.0.0'
