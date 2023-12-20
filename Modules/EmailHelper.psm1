@@ -26,15 +26,21 @@ function Get-HaloUserEmail {
         [int]$ClientId
     )
 
-    # Retrieves the email address for a specified Halo user.
-    $address = (Get-HaloUser -Search $Username -ClientID $ClientId).emailaddress
+    try {
+        $address = (Get-HaloUser -Search $Username -ClientID $ClientId).emailaddress
 
-    if (-not $address) {
+        if (-not $address) {
+            Write-Error "No email address found for user $Username with client ID $ClientId"
+            return $false
+        } else { 
+            return $address
+        }
+    } catch {
+        Write-Error "Failed to retrieve email address: $_"
         return $false
-    } else { 
-        return $address
     }
 }
+
 
 <#
 .SYNOPSIS
@@ -70,26 +76,32 @@ function Send-HaloEmailResponse {
         [int]$TicketId
     )
 
-    # Sends an email response via Halo.
-    $dateArrival = (Get-Date).AddMinutes(-1)
-    $dateEnd = Get-Date
+    try {
+        # Sends an email response via Halo.
+        $dateArrival = (Get-Date).AddMinutes(-1)
+        $dateEnd = Get-Date
 
-    $ActionUpdate = @{
-        ticket_id             = $TicketId
-        outcome               = "Email User"
-        outcome_id            = 16
-        emailfrom             = "IT Support"
-        replytoaddress        = "helpdesk@aegis-group.co.uk"
-        emailto               = $EmailAddress
-        note                  = $EmailMessage
-        actionarrivaldate     = $dateArrival
-        actioncompletiondate  = $dateEnd
-        action_isresponse     = $false
-        validate_response     = $false
-        sendemail             = $true
+        $ActionUpdate = @{
+            ticket_id             = $TicketId
+            outcome               = "Email User"
+            outcome_id            = 16
+            emailfrom             = "IT Support"
+            replytoaddress        = "helpdesk@aegis-group.co.uk"
+            emailto               = $EmailAddress
+            note                  = $EmailMessage
+            actionarrivaldate     = $dateArrival
+            actioncompletiondate  = $dateEnd
+            action_isresponse     = $false
+            validate_response     = $false
+            sendemail             = $true
+        }
+
+        New-HaloAction -Action $ActionUpdate
+
+    } catch {
+        Write-Error "Failed to send email: $_"
+        return $false
     }
-
-    New-HaloAction -Action $ActionUpdate
 }
 
 <#
@@ -129,13 +141,27 @@ function FindAndSendHaloResponse {
         [int]$TicketId
     )
 
-    # Retrieves user email and sends a response.
-    $EmailAddress = Get-HaloUserEmail -Username $Username -ClientId $ClientId
+    try {
+        $EmailAddress = Get-HaloUserEmail -Username $Username -ClientId $ClientId
 
-    if (-not $EmailAddress) {
+        if (-not $EmailAddress) {
+            Write-Error "Email address not found for user $Username"
+            return $false
+        }
+
+        $sendResult = Send-HaloEmailResponse -EmailAddress $EmailAddress -EmailMessage $EmailMessage -TicketId $TicketId
+
+        if (-not $sendResult) {
+            Write-Error "Failed to send email to $EmailAddress"
+            return $false
+        }
+
+        return $true
+    } catch {
+        Write-Error "An error occurred: $_"
         return $false
     }
-
-    Send-HaloEmailResponse -EmailAddress $EmailAddress -EmailMessage $EmailMessage -TicketId $TicketId
-    return $true
 }
+
+# Exporting Module Members
+Export-ModuleMember -Function Get-HaloUserEmail, Send-HaloEmailResponse, FindAndSendHaloResponse
