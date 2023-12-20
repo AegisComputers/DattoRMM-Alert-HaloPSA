@@ -41,7 +41,7 @@ AliasesToExport = @()
 NestedModules = @()
 
 # List of all files packaged with this module.
-FileList = @('HaloHelper.psm1')
+FileList = @('HaloEmail.psm1')
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess.
 PrivateData = @{
