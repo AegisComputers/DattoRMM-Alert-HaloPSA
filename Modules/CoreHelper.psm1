@@ -373,7 +373,7 @@ Function Get-AlertEmailBody($AlertWebhook) {
             Get-DRMMAlertHistorySection -Sections $Sections -Alert $Alert -DattoPlatform $DattoPlatform
         }
 
-        $TicketSubject = "Alert: $($AlertTypesLookup[$Alert.alertContext.'@class']) - $($AlertMessage) on device: $($Device.hostname)"
+        $TicketSubject = "Device: $($Device.hostname) raised Alert: $($AlertTypesLookup[$Alert.alertContext.'@class']) - $($AlertMessage)"
 
         $HTMLBody = Get-HTMLBody -Sections $Sections -NumberOfColumns $NumberOfColumns
     
