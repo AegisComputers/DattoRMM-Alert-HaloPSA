@@ -62,7 +62,7 @@ function Get-HeatMap {
     }
 
     $Html = @"
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="padding: 0; margin:0; border-spacing: 0px; border-collapse: collapse;"><thead>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="padding: 0;margin:0;border-spacing: 0px;border-collapse: collapse;color: #ffffff;"><thead>
         <tr>
             <td width=15%></td>$HeaderRow
         </tr>
