@@ -160,40 +160,6 @@ if ($Email) {
         )
     }
 
-
-    # Handle reoccurring alerts
-    #Parent tickets not working removed for now 
-#    if ($ReoccuringAlerts) {        
- #       $ReoccuringAlertParent = $ReoccuringAlerts | Sort-Object FaultID | Select-Object -First 1
-  #              
-   #     if ($ReoccuringAlertParent.ParentID) {
-    #        $ParentID = $ReoccuringAlertParent.ParentID
-     #   } else {
-      #      $ParentID = $ReoccuringAlertParent.FaultID
-       # }
-        #
-#        $RecurringUpdate = @{
- #           id        = $ParentID
-  #          status_id = $HaloReocurringStatus   
-   #     }
-#
- #       $null = Set-HaloTicket -Ticket $RecurringUpdate
-#
- #       $HaloTicketCreate.add('parent_id', $ParentID)
-  #      
-   # } elseif ($RelatedAlerts) {
-    #    $RelatedAlertsParent = $RelatedAlerts | Sort-Object FaultID | Select-Object -First 1
-#
- #       if ($RelatedAlertsParent.RelatedID -ne 0) {
-  #          $CreatedFromID = $RelatedAlertsParent.RelatedID
-   #     } else {
-    #        $CreatedFromID = $RelatedAlertsParent.FaultID
-     #   }
-      #  
-       # $HaloTicketCreate.add('createdfrom_id', $CreatedFromID)
-#
- #   } 
-
     # Your command to get tickets
     $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly -FullObjects
 
@@ -276,6 +242,17 @@ if ($Email) {
     } else {
         Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+
+        # Handle Specific Ticket responses based on ticket subject type
+        # Check if the alert message contains the specific disk usage alert for the C: drive
+        if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
+            # Perform your action here
+            Write-Host "Alert detected for high disk usage on C: drive. Taking action..."
+
+            #Needs to send email to user
+            #Look up from Datto 365 integration? or 365 AAD lookup? or Halo contacts list? 
+            
+        }   
     }
 
     $HaloTicketCreate | Out-String | Write-Host
