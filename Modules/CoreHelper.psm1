@@ -343,7 +343,9 @@ Function Get-AlertEmailBody($AlertWebhook) {
         SecretKey = $DattoSecretKey
     }
 
-    Write-Host $params
+    Write-Host $DattoURL
+    Write-Host $DattoKey
+    Write-Host $DattoSecretKey
 
     Write-Host "6"
 
