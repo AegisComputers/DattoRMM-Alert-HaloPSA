@@ -9,10 +9,14 @@ $HaloClientID = $env:HaloClientID
 $HaloClientSecret = $env:HaloClientSecret
 $HaloURL = $env:HaloURL
 
+Write-Host "1"
+
 $HaloTicketStatusID = $env:HaloTicketStatusID
 $HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
 $HaloTicketType = $env:HaloTicketType
 $HaloReocurringStatus = $env:HaloReocurringStatus
+
+Write-Host "2"
 
 #Custom Env Vars
 $DattoAlertUIDField = $env:DattoAlertUIDField
@@ -36,9 +40,16 @@ $PriorityHaloMap = @{
     "Information" = "4"
 }
 
+Write-Host "3"
+
 $AlertWebhook = $Request.Body # | ConvertTo-Json -Depth 100
 
+Write-Host "4"
+
 $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
+Write-Host $Email
+Write-host $AlertWebhook
+Write-Host "5"
 
 if ($Email) {
     $Alert = $Email.Alert
