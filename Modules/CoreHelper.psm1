@@ -347,17 +347,11 @@ Function Get-AlertEmailBody($AlertWebhook) {
     Write-Host $DattoKey
     Write-Host $DattoSecretKey
 
-    Write-Host "6"
-
     Set-DrmmApiParameters @params
-
-    Write-Host "7"
 
     $Alert = Get-DrmmAlert -alertUid $AlertID
 
     Write-Host $Alert
-
-    Write-Host "8"
 
     if ($Alert) {
         [System.Collections.Generic.List[PSCustomObject]]$Sections = @()

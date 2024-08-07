@@ -9,14 +9,10 @@ $HaloClientID = $env:HaloClientID
 $HaloClientSecret = $env:HaloClientSecret
 $HaloURL = $env:HaloURL
 
-Write-Host "1"
-
 $HaloTicketStatusID = $env:HaloTicketStatusID
 $HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
 $HaloTicketType = $env:HaloTicketType
 $HaloReocurringStatus = $env:HaloReocurringStatus
-
-Write-Host "2"
 
 #Custom Env Vars
 $DattoAlertUIDField = $env:DattoAlertUIDField
@@ -40,16 +36,9 @@ $PriorityHaloMap = @{
     "Information" = "4"
 }
 
-Write-Host "3"
-
 $AlertWebhook = $Request.Body # | ConvertTo-Json -Depth 100
 
-Write-Host "4"
-
 $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
-Write-Host $Email
-Write-host $AlertWebhook
-Write-Host "5"
 
 if ($Email) {
     $Alert = $Email.Alert
@@ -112,7 +101,7 @@ if ($Email) {
 
     $RSiteDetails = $Request.Body.dattoSiteDetails
 
-    Start-Sleep -Seconds 15
+    Start-Sleep -Seconds 5
 
     $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
 
@@ -211,7 +200,7 @@ if ($Email) {
         }
     }
 
-    Start-Sleep -Seconds 15
+    Start-Sleep -Seconds 5
     
     if ($Request.Body.resolvedAlert -eq "true") {
         Write-Host "Resolved Closing $ticketidHalo"
@@ -225,7 +214,7 @@ if ($Email) {
         }
         $null = Set-HaloTicket -Ticket $TicketUpdate
 
-        Start-Sleep -Seconds 1
+        Start-Sleep -Seconds 5
 
         $Actions = Get-HaloAction -TicketID $TicketID
 
@@ -239,7 +228,7 @@ if ($Email) {
             Set-HaloAction -Action $ReviewData
         }
         
-        Start-Sleep -Seconds 1
+        Start-Sleep -Seconds 5
 
         $dateInvoice = (get-date)
         $invoice = @{ 
@@ -257,9 +246,48 @@ if ($Email) {
         
             # Perform your action here
             Write-Host "Alert detected for high disk usage on C: drive. Taking action..." 
+
+            Write-Host "Creating Ticket"
+            $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
             
         } elseif ($TicketSubject -like "*Alert: Component Monitor - [Monitor Hyper-V Replication [WIN]]*") {
+
+            Write-Host "Alert detected for Hyper-V Replication. Taking action..." 
+
+            # Set the time zone to UTC
+            $TimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("UTC")
+
+            # Get the current time in UTC
+            $CurrentTimeUTC = [System.DateTime]::UtcNow
+
+            # Define the UK time zone
+            $UKTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("GMT Standard Time")
+
+            # Convert the current time to UK time
+            $CurrentTimeUK = [System.TimeZoneInfo]::ConvertTimeFromUtc($CurrentTimeUTC, $UKTimeZone)
+
+            # Get the hour part of the current time in UK time zone
+            $CurrentHourUK = $CurrentTimeUK.Hour
+            $CurrentMinuteUK = $CurrentTimeUK.Minute
+
+            # Check if the current time is between 9 AM and 5:30 PM (09:00 and 17:30)
+            $StartTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 9, 0, 0)
+            $EndTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 17, 30, 0)
+
+            if ($CurrentTimeUK -ge $StartTime -and $CurrentTimeUK -lt $EndTime) {
+                Write-Output "The current time is between 9 AM and 5:30 PM UK time. A ticket will be created!"
+                Write-Host "Creating Ticket"
+                $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+            } else {
+                Write-Output "The current time is outside of 9 AM and 5:30 PM UK time. No Ticket will be created!"
+            }
         
+        } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
+
+            Write-Host "Alert detected for Patching. Taking action..." 
+
+            #Handle Patch Alerts here. WORK IN PROGRESS
+            
         } else {
             Write-Host "Creating Ticket"
             $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
