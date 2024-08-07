@@ -251,19 +251,19 @@ if ($Email) {
         New-HaloInvoice -Invoice $invoice 
         
     } else {
-        Write-Host "Creating Ticket"
-        $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
-
         # Handle Specific Ticket responses based on ticket subject type
         # Check if the alert message contains the specific disk usage alert for the C: drive
         if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
+        
             # Perform your action here
-            Write-Host "Alert detected for high disk usage on C: drive. Taking action..."
-
-            #Needs to send email to user
-            #Look up from Datto 365 integration? or 365 AAD lookup? or Halo contacts list? 
+            Write-Host "Alert detected for high disk usage on C: drive. Taking action..." 
             
-        }   
+        } elseif ($TicketSubject -like "*Alert: Component Monitor - [Monitor Hyper-V Replication [WIN]]*") {
+        
+        } else {
+            Write-Host "Creating Ticket"
+            $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+        }
     }
 
     $HaloTicketCreate | Out-String | Write-Host
