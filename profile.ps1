@@ -15,8 +15,14 @@
 foreach($file in Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter *.psm1){
     Import-Module $file.fullname
 }
-import-module DattoRMM
+
+Import-module DattoRMM
 Import-Module HaloAPI
+
+# Import Az and AzTable modules
+Import-Module Az.Accounts
+Import-Module Az.Storage
+Import-Module AzTable
 
 # Uncomment the next line to enable legacy AzureRm alias in Azure PowerShell.
 # Enable-AzureRmAlias
