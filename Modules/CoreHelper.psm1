@@ -395,3 +395,59 @@ Function Get-AlertEmailBody($AlertWebhook) {
         Return $Null
     }
 }
+
+# Function to create the storage context
+function Get-StorageContext {
+    return New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
+}
+
+# Function to get or create a table
+function Get-StorageTable {
+    param (
+        [string]$tableName
+    )
+
+    $storageContext = Get-StorageContext
+    $table = Get-AzStorageTable -Context $storageContext -Name $tableName -ErrorAction SilentlyContinue
+
+    if (-not $table) {
+        $table = New-AzStorageTable -Context $storageContext -Name $tableName
+    }
+
+    return $table.CloudTable
+}
+
+# Function to insert or merge entity
+function InsertOrMergeEntity {
+    param (
+        [Microsoft.Azure.Cosmos.Table.CloudTable]$table,
+        [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]$entity
+    )
+
+    $operation = [Microsoft.Azure.Cosmos.Table.TableOperation]::InsertOrMerge($entity)
+    $result = $table.Execute($operation)
+    return $result.Result
+}
+
+function GetEntity {
+    param (
+        $table,
+        $partitionKey,
+        $rowKey
+    )
+
+    
+
+    try {
+        $entity = Get-AzTableRow -RowKey $rowKey -Table $table -PartitionKey $partitionKey
+        if ($entity -ne $null) {
+            
+            return $entity
+        } else {
+            
+            return $null
+        }
+    } catch {
+        return $null
+    }
+}

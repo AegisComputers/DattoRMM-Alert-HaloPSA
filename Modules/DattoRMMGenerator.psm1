@@ -286,7 +286,7 @@ function Get-DRMMAlertHistorySection {
     )
 
     $AlertsTableStyle = '<table style="border-width: 1px; border-style: solid; border-color: white; border-collapse: collapse; table-layout: auto !important;" width=100%; color: #ffffff;>'
-    $AlertsTableTDStyle = '<td style = "border-width: 1px; padding: 3px; border-style: solid; border-color: white; overflow-wrap: break-word" width=auto>'
+    $AlertsTableTDStyle = '<td style = "border-width: 1px; padding: 3px; border-style: solid; border-color: white; overflow-wrap: break-word" width=auto; color: #ffffff;>'
 
     [System.Collections.Generic.List[PSCustomObject]]$AllAlerts = @()
     $DeviceOpenAlerts = Get-DrmmDeviceOpenAlerts -deviceUid $Alert.alertSourceInfo.deviceUid
@@ -313,6 +313,7 @@ function Get-DRMMAlertHistorySection {
 
     $HTMLOpenAlerts = $ParsedOpenAlerts | Sort-Object Created -desc | convertto-html -Fragment
     $HTMLParsedOpenAlerts = [System.Web.HttpUtility]::HtmlDecode(((($HTMLOpenAlerts) -replace '<table>', $AlertsTableStyle) -replace '<td>', $AlertsTableTDStyle))
+    $HTMLParsedOpenAlerts = "<div style='color: #ffffff;'>$HTMLParsedOpenAlerts</div>"
 
     $ParsedResolvedAlerts = $DeviceResolvedAlerts | select-object @{n = 'View'; e = { "<a class=`"button-a button-a-primary`" target=`"_blank`" href=`"https://$($DattoPlatform)rmm.centrastage.net/alert/$($_.alertUid)`" style=`"background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;`">View</a>" } },
     @{n = 'Priority'; e = { $_.priority } },
@@ -322,6 +323,7 @@ function Get-DRMMAlertHistorySection {
 
     $HTMLResolvedAlerts = $ParsedResolvedAlerts | Sort-Object Created -desc | select-object -first 10 | convertto-html -Fragment
     $HTMLParsedResolvedAlerts = [System.Web.HttpUtility]::HtmlDecode(((($HTMLResolvedAlerts) -replace '<table>', $AlertsTableStyle) -replace '<td>', $AlertsTableTDStyle))
+    $HTMLParsedResolvedAlerts = "<div style='color: #ffffff;'>$HTMLParsedResolvedAlerts</div>"
 
     $AlertHistoryHTML = @"
     <!-- Alert Details : BEGIN -->

@@ -1,4 +1,5 @@
 using namespace System.Net
+using namespace Microsoft.Azure.Cosmos.Table
 
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
@@ -16,6 +17,11 @@ $HaloReocurringStatus = $env:HaloReocurringStatus
 
 #Custom Env Vars
 $DattoAlertUIDField = $env:DattoAlertUIDField
+
+#AZStorageVars
+$storageAccountName = "dattohaloalertsstgnirab"
+$storageAccountKey = "39+4Dry3C4/Vy2G/ZgN1CrBz4FDvef9yXoMXLZ1ga/B/pYdt+BNkPVUvHVX7BrKxVewrgp00O/4p+AStLkAejw=="
+$tableName = "DevicePatchAlerts"
 
 # Set if the ticket will be marked as responded in Halo
 $SetTicketResponded = $True
@@ -286,7 +292,46 @@ if ($Email) {
 
             Write-Host "Alert detected for Patching. Taking action..." 
 
-            #Handle Patch Alerts here. WORK IN PROGRESS
+            $AlertID = $AlertWebhook.alertUID
+            $AlertDRMM = Get-DrmmAlert -alertUid $AlertID
+            #$AlertDRMM = $true
+
+            if ($AlertDRMM) {
+                $Device = Get-DrmmDevice -deviceUid $AlertDRMM.alertSourceInfo.deviceUid
+                $DeviceHostname = $Device.hostname
+                #$DeviceHostname = "TestDevice005"
+
+                $partitionKey = "DeviceAlert"
+                $rowKey = $DeviceHostname
+
+                $table = Get-StorageTable -tableName $tableName
+                $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
+
+                if ($entity -eq $null) {
+                    # New device hostname, initialize alert count
+                    $entity = [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]::new($partitionKey, $rowKey)
+                    $entity.Properties.Add("AlertCount", [Microsoft.Azure.Cosmos.Table.EntityProperty]::GeneratePropertyForInt(1))
+                    # Insert or merge the entity
+                    InsertOrMergeEntity -table $table -entity $entity
+                } else {
+                    # Existing device hostname, increment alert count
+                    $entity.AlertCount++
+                    Update-AzTableRow -Table $table -entity $entity
+                }
+
+
+
+                # Perform an action if the alert count exceeds a threshold
+                $threshold = 5
+                if ($entity.AlertCount -ge $threshold) {
+                    # Perform your action here
+                    Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
+
+                    remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
+                }
+            } else {
+                Write-Host "Alert missing in Datto RMM no further action...." 
+            }
             
         } else {
             Write-Host "Creating Ticket"
