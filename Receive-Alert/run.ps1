@@ -20,7 +20,7 @@ $DattoAlertUIDField = $env:DattoAlertUIDField
 
 #AZStorageVars
 $storageAccountName = "dattohaloalertsstgnirab"
-$storageAccountKey = "39+4Dry3C4/Vy2G/ZgN1CrBz4FDvef9yXoMXLZ1ga/B/pYdt+BNkPVUvHVX7BrKxVewrgp00O/4p+AStLkAejw=="
+$storageAccountKey = $env:strKey
 $tableName = "DevicePatchAlerts"
 
 # Set if the ticket will be marked as responded in Halo
