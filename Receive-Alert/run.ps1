@@ -256,7 +256,7 @@ if ($Email) {
             Write-Host "Creating Ticket"
             $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
             
-        } elseif ($TicketSubject -like "*Alert: Component Monitor - [Monitor Hyper-V Replication [WIN]]*") {
+        } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
 
             Write-Host "Alert detected for Hyper-V Replication. Taking action..." 
 
