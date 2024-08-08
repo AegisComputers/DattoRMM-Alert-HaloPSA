@@ -4,8 +4,8 @@
 @{
     'DattoRMM' = '1.0.0.28'
     'HaloAPI' = '1.16.0'
-    'Az.Accounts' = '2.*'  # For authentication and account management
-    'Az.Storage' = '3.*'   # For Azure Storage operations
-    'AzTable' = '2.*'      # For Azure Table Storage operations including Get-AzTableRow, Update-AzTableRow, and Remove-AzTableRow
-    'Az' = '9.*'           # Ensuring the latest Az module version which includes all necessary dependencies
+    'Az.Accounts' = '3.0.3'  # For authentication and account management
+    'Az.Storage' = '5.1.0'   # For Azure Storage operations
+    'AzTable' = '2.1.0'      # For Azure Table Storage operations including Get-AzTableRow, Update-AzTableRow, and Remove-AzTableRow
+    'Az' = '9.1.1'           # Ensuring the latest Az module version which includes all necessary dependencies
 }

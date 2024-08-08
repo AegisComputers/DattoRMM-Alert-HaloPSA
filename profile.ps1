@@ -18,9 +18,6 @@ foreach($file in Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter *.psm1){
 
 Import-module DattoRMM
 Import-Module HaloAPI
-
-# Import Az and AzTable modules
-Import-Module Az
 Import-Module Az.Accounts
 Import-Module Az.Storage
 Import-Module AzTable

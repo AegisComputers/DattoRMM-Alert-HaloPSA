@@ -327,6 +327,9 @@ if ($Email) {
                     # Perform your action here
                     Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
 
+                    Write-Host "Creating Ticket"
+                    $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+
                     remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
                 }
             } else {
