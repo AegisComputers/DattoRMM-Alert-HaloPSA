@@ -210,40 +210,41 @@ if ($Email) {
     
     if ($Request.Body.resolvedAlert -eq "true") {
         Write-Host "Resolved Closing $ticketidHalo"
-
-        $TicketID = $ticketidHalo
+        if ($ticketidHalo -ne $null){
+            $TicketID = $ticketidHalo
         
-        $TicketUpdate = @{
-            id        = $TicketID 
-            status_id = 9
-            agent_id  = 38
-        }
-        $null = Set-HaloTicket -Ticket $TicketUpdate
-
-        Start-Sleep -Seconds 5
-
-        $Actions = Get-HaloAction -TicketID $TicketID
-
-        # Mass review logic
-        foreach ($action in $actions) {
-           $ReviewData = @{
-               ticket_id = $action.ticket_id
-               id = $action.id
-               actreviewed = "true"
+            $TicketUpdate = @{
+                id        = $TicketID 
+                status_id = 9
+                agent_id  = 38
             }
-            Set-HaloAction -Action $ReviewData
-        }
+            $null = Set-HaloTicket -Ticket $TicketUpdate
+
+            Start-Sleep -Seconds 5
+
+            $Actions = Get-HaloAction -TicketID $TicketID
+
+            # Mass review logic
+            foreach ($action in $actions) {
+               $ReviewData = @{
+                   ticket_id = $action.ticket_id
+                   id = $action.id
+                   actreviewed = "true"
+                }
+                Set-HaloAction -Action $ReviewData
+            }
         
-        Start-Sleep -Seconds 5
+            Start-Sleep -Seconds 5
 
-        $dateInvoice = (get-date)
-        $invoice = @{ 
-            client_id = $HaloClientDattoMatch
-            invoice_date = $dateInvoice
-            lines = @(@{entity_type = "labour";ticket_id = $TicketID})
+            $dateInvoice = (get-date)
+            $invoice = @{ 
+                client_id = $HaloClientDattoMatch
+                invoice_date = $dateInvoice
+                lines = @(@{entity_type = "labour";ticket_id = $TicketID})
+            }
+
+            New-HaloInvoice -Invoice $invoice 
         }
-
-        New-HaloInvoice -Invoice $invoice 
         
     } else {
         # Handle Specific Ticket responses based on ticket subject type
@@ -296,7 +297,7 @@ if ($Email) {
             $AlertDRMM = Get-DrmmAlert -alertUid $AlertID
             #$AlertDRMM = $true
 
-            if ($AlertDRMM) {
+            if ($AlertDRMM -ne $Null) {
                 $Device = Get-DrmmDevice -deviceUid $AlertDRMM.alertSourceInfo.deviceUid
                 $DeviceHostname = $Device.hostname
                 #$DeviceHostname = "TestDevice005"

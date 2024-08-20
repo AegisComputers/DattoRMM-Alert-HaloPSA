@@ -396,6 +396,11 @@ Function Get-AlertEmailBody($AlertWebhook) {
     }
 }
 
+#AZStorageVars
+$storageAccountName = "dattohaloalertsstgnirab"
+$storageAccountKey = $env:strKey
+$tableName = "DevicePatchAlerts"
+
 # Function to create the storage context
 function Get-StorageContext {
     return New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
