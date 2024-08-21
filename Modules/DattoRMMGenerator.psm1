@@ -114,8 +114,6 @@ function Get-DRMMAlertDetailsSection {
 
 }
 
-
-
 function Get-DRMMDeviceDetailsSection {
     <#
     This function returns the HTML for the device details section.
@@ -169,7 +167,6 @@ function Get-DRMMDeviceDetailsSection {
     $Sections.add($DeviceDetailsSection)
 
 }
-
 
 function Get-DRMMDeviceStatusSection {
     <#

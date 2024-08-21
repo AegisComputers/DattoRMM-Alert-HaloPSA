@@ -441,8 +441,6 @@ function GetEntity {
         $rowKey
     )
 
-    
-
     try {
         $entity = Get-AzTableRow -RowKey $rowKey -Table $table -PartitionKey $partitionKey
         if ($entity -ne $null) {

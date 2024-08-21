@@ -6,6 +6,7 @@ param($Request, $TriggerMetadata)
 
 Write-Host "Processing Webhook for Alert - $($Request.Body.alertUID) -"
 
+#Halo Vars
 $HaloClientID = $env:HaloClientID
 $HaloClientSecret = $env:HaloClientSecret
 $HaloURL = $env:HaloURL
@@ -32,8 +33,9 @@ $RelatedAlertMinutes = 5
 # Creates a child ticket in Halo off the main ticket if it reocurrs with the specified number of hours.
 $ReoccurringTicketHours = 24
 
-$HaloAlertHistoryDays = 90
+$HaloAlertHistoryDays = 30
 
+#Priority Mapping
 $PriorityHaloMap = @{
     "Critical"    = "4"
     "High"        = "4"
@@ -42,6 +44,7 @@ $PriorityHaloMap = @{
     "Information" = "4"
 }
 
+#AlertWebhook Body
 $AlertWebhook = $Request.Body # | ConvertTo-Json -Depth 100
 
 $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
@@ -91,28 +94,38 @@ if ($Email) {
         reportingperiod          = "7"
     }
 
+    # Retrieve the report rows from a Halo report based on the given alert report filter
     $ReportResults = (Set-HaloReport -Report $AlertReportFilter).report.rows
 
+    # Filter the report results to find any history of recurring alerts that match the specific alert type
     $ReoccuringHistory = $ReportResults | where-object { $_.CFDattoAlertType -eq $ParsedAlertType } 
     
+    # Further filter the recurring alerts to find those that occurred within the specified time frame
     $ReoccuringAlerts = $ReoccuringHistory | where-object { $_.dateoccured -gt ((Get-Date).addhours(-$ReoccurringTicketHours)) }
 
+    # Find related alerts that occurred within a different specified time frame and are of a different alert type
     $RelatedAlerts = $ReportResults | where-object { $_.dateoccured -gt ((Get-Date).addminutes(-$RelatedAlertMinutes)).ToUniversalTime() -and $_.CFDattoAlertType -ne $ParsedAlertType }
-        
+    
+    # Capture the subject of the email alert
     $TicketSubject = $Email.Subject
 
+    # Capture the body content of the email alert in HTML format
     $HTMLBody = $Email.Body
 
+    # Map the priority of the alert to the corresponding Halo priority using the priority mapping
     $HaloPriority = $PriorityHaloMap."$($Alert.Priority)"
 
+    # Retrieve the site details from the request body (Datto site details)
     $RSiteDetails = $Request.Body.dattoSiteDetails
 
     Start-Sleep -Seconds 5
 
+    # Find the Halo site ID associated with the Datto site name provided in the site details
     $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
 
     Write-Host ($RSiteDetails)
 
+    # Store the Datto site details from the request body into a variable
     $dattoLookupString = $Request.Body.dattoSiteDetails
 
     #Process based on naming scheme in Datto <site>(<Customer>)
@@ -147,7 +160,7 @@ if ($Email) {
         summary          = $TicketSubject
         tickettype_id    = 8
         details_html     = $HtmlBody
-        DattoAlertState = 0
+        DattoAlertState  = 0
         site_id          = $HaloSiteIDDatto
         assets           = @(@{id = $HaloDevice.did })
         priority_id      = $HaloPriority
@@ -251,11 +264,16 @@ if ($Email) {
         # Check if the alert message contains the specific disk usage alert for the C: drive
         if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
         
-            # Perform your action here
+            # Perform action here
             Write-Host "Alert detected for high disk usage on C: drive. Taking action..." 
+
+            ### Logic to get username of user for device from Datto here
 
             Write-Host "Creating Ticket"
             $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+
+            ### Logic to send the email to the user asking them to clean up from space from Halo using email helper class and $ticket var
+
             
         } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
 
@@ -295,12 +313,10 @@ if ($Email) {
 
             $AlertID = $AlertWebhook.alertUID
             $AlertDRMM = Get-DrmmAlert -alertUid $AlertID
-            #$AlertDRMM = $true
 
             if ($AlertDRMM -ne $Null) {
                 $Device = Get-DrmmDevice -deviceUid $AlertDRMM.alertSourceInfo.deviceUid
                 $DeviceHostname = $Device.hostname
-                #$DeviceHostname = "TestDevice005"
 
                 $partitionKey = "DeviceAlert"
                 $rowKey = $DeviceHostname
@@ -319,8 +335,6 @@ if ($Email) {
                     $entity.AlertCount++
                     Update-AzTableRow -Table $table -entity $entity
                 }
-
-
 
                 # Perform an action if the alert count exceeds a threshold
                 $threshold = 5

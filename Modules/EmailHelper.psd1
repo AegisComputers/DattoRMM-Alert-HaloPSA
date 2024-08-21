@@ -20,7 +20,7 @@ Author = 'Oliver Perring'
 CompanyName = 'Aegis Computers'
 
 # Copyright statement for this module.
-Copyright = '(c) 2023 Oliver Perring. All rights reserved.'
+Copyright = '(c) 2024 Oliver Perring. All rights reserved.'
 
 # Description of the functionality provided by this module.
 Description = 'This module, HaloHelper, provides enhanced email handling and response functionalities for Halo services.'
