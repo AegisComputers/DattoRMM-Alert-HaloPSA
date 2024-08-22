@@ -1,7 +1,7 @@
 # DattoRMM-Alerts-Halo
 Takes Datto RMM Alert Webhooks and sends them to Halo PSA
 
-Heavily updated from https://github.com/lwhitelock/DattoRMM-Alert-HaloPSA bespoke modifications made to match Aegis Computers configuration
+Heavily updated from https://github.com/lwhitelock/DattoRMM-Alert-HaloPSA bespoke modifications made to match an specific internal structure
 
 ### Halo Custom field
 Create a custom field on tickets in Halo with these details:
@@ -47,6 +47,8 @@ This is the status you would like to set tickets to if they reoccur.
 
 ## Installation
 To Deploy you can click the below button and then configure the settings as detailed above.
+
+Not all needed env vars will work right now, read the script and understand what you need to change first!
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3a%2f%2fraw.githubusercontent.com%2fOliverPerring%2fDattoRMM-Alert-HaloPSA%2fmain%2fDeployment%2fAzureDeployment.json)
 

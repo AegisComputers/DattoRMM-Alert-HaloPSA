@@ -13,7 +13,13 @@
 # Remove this if you are not planning on using MSI or Azure PowerShell.
 
 foreach($file in Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter *.psm1){
-    Import-Module $file.fullname
+    try {
+        Import-Module $file.FullName
+        Write-Host "Module $($file.Name) loaded successfully."
+    } catch {
+        Write-Host "Failed to load module $($file.Name). Error: $_"
+        throw
+    }
 }
 
 Import-module DattoRMM
@@ -26,3 +32,8 @@ Import-Module AzTable
 # Enable-AzureRmAlias
 
 # You can also define functions or aliases that can be referenced in any of your PowerShell functions.
+
+#Log the start time for reference
+$coldStartTime = Get-Date
+Write-Host "Function App cold start at: $coldStartTime"
+
