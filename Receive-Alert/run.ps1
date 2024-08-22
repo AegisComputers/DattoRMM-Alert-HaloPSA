@@ -24,6 +24,19 @@ $storageAccountName = "dattohaloalertsstgnirab"
 $storageAccountKey = $env:strKey
 $tableName = "DevicePatchAlerts"
 
+#Datto Vars
+$DattoURL = $env:DattoURL
+$DattoKey = $env:DattoKey
+$DattoSecretKey = $env:DattoSecretKey
+
+$paramsDatto = @{
+   Url       = $DattoURL
+   Key       = $DattoKey
+   SecretKey = $DattoSecretKey
+}
+
+Set-DrmmApiParameters @paramsDatto
+
 # Set if the ticket will be marked as responded in Halo
 $SetTicketResponded = $True
 
@@ -268,12 +281,20 @@ if ($Email) {
             Write-Host "Alert detected for high disk usage on C: drive. Taking action..." 
 
             ### Logic to get username of user for device from Datto here
+            $AlertUID = $Request.Body.alertUID
+
+            $AlertDetails = Get-DrmmAlert -alertUid $AlertUID
+            $Device = Get-DrmmDevice -deviceUid $AlertDetails.alertSourceInfo.deviceUid
+
+            $LastUser = $Device.lastLoggedInUser
+            $Username = $LastUser -replace '^[^\\]*\\', ''
 
             Write-Host "Creating Ticket"
             $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 
             ### Logic to send the email to the user asking them to clean up from space from Halo using email helper class and $ticket var
 
+            FindAndSendHaloResponse -Username $Username -ClientID $HaloClientDattoMatch -TicketId $ticket.id -EmailMessage "You have less than 10% local storage space left. Deleting downloaded files, emptying recycle bin or making large files cloud only with One Drive could free up space. If you are unable to resolve this please respond to this email"
             
         } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
 
