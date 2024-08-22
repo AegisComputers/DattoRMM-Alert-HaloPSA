@@ -368,6 +368,13 @@ if ($Email) {
 
                     remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
                 }
+            } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
+                Write-Host "Backup Exec Alert Detected"
+
+                #Logic here to find BKE related email/ticket
+
+                Write-Host "Creating Ticket"
+                $Ticket = New-HaloTicket -Ticket $HaloTicketCreate   
             } else {
                 Write-Host "Alert missing in Datto RMM no further action...." 
             }
