@@ -10,14 +10,10 @@ Write-Host "Processing Webhook for Alert - $($Request.Body.alertUID) -"
 $HaloClientID = $env:HaloClientID
 $HaloClientSecret = $env:HaloClientSecret
 $HaloURL = $env:HaloURL
-
 $HaloTicketStatusID = $env:HaloTicketStatusID
 $HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
 $HaloTicketType = $env:HaloTicketType
 $HaloReocurringStatus = $env:HaloReocurringStatus
-
-#Custom Env Vars
-$DattoAlertUIDField = $env:DattoAlertUIDField
 
 #AZStorageVars
 $storageAccountName = "dattohaloalertsstgnirab"
@@ -28,6 +24,7 @@ $tableName = "DevicePatchAlerts"
 $DattoURL = $env:DattoURL
 $DattoKey = $env:DattoKey
 $DattoSecretKey = $env:DattoSecretKey
+$DattoAlertUIDField = $env:DattoAlertUIDField
 
 $paramsDatto = @{
    Url       = $DattoURL
@@ -65,6 +62,7 @@ $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
 if ($Email) {
     $Alert = $Email.Alert
 
+    #Connect to the halo api with the env vars
     Connect-HaloAPI -URL $HaloURL -ClientId $HaloClientID -ClientSecret $HaloClientSecret -Scopes "all"
     
     $HaloDeviceReport = @{
@@ -196,7 +194,7 @@ if ($Email) {
     $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly -FullObjects
 
     # The UID you are looking for
-    $targetUID = $Request.Body.alertUID #"d001df5e-ed49-4077-9479-fa7e3d08b121"
+    $targetUID = $Request.Body.alertUID
 
     # Iterate over each ticket in the result
     foreach ($ticket in $TicketidGet) {
@@ -360,7 +358,7 @@ if ($Email) {
                 # Perform an action if the alert count exceeds a threshold
                 $threshold = 5
                 if ($entity.AlertCount -ge $threshold) {
-                    # Perform your action here
+                    
                     Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
 
                     Write-Host "Creating Ticket"
