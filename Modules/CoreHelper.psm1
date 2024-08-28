@@ -246,7 +246,7 @@ function Get-HTMLBody {
         $Block = @"
     <!-- Block HTML Start -->
     <td class="col-lg-4"
-        style="line-height: 24px; font-size: 16px; min-height: 1px; font-weight: normal; padding:24px; width: $CalculatedWidth%; margin: 0; background-color:#222222; border-left: 20px solid #333333; border-right: 20px solid #333333; border-top: 20px solid #333333;"
+        style="line-height: 24px; font-size: 16px; min-height: 1px; font-weight: normal; padding:24px; width: $CalculatedWidth%; margin: 0; background-color:#222222; border-right: 20px solid #333333; border-top: 20px solid #333333;"
         align="left" valign="top">
         <table width="100%"class="ax-center" role="presentation" align="center" border="0" cellpadding="0" cellspacing="0"
             style="margin: 0 auto;">
