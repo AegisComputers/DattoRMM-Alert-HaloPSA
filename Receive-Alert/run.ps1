@@ -135,8 +135,6 @@ if ($Email) {
     # Retrieve the site details from the request body (Datto site details)
     $RSiteDetails = $Request.Body.dattoSiteDetails
 
-    Start-Sleep -Seconds 5
-
     # Find the Halo site ID associated with the Datto site name provided in the site details
     $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
 
