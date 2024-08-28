@@ -12,6 +12,7 @@
 # Authenticate with Azure PowerShell using MSI.
 # Remove this if you are not planning on using MSI or Azure PowerShell.
 
+#Custom Modules
 foreach($file in Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter *.psm1){
     try {
         Import-Module $file.FullName
@@ -22,6 +23,7 @@ foreach($file in Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter *.psm1){
     }
 }
 
+#Installed Modules
 Import-module DattoRMM
 Import-Module HaloAPI
 Import-Module Az.Accounts
