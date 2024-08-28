@@ -6,6 +6,12 @@ param($Request, $TriggerMetadata)
 
 Write-Host "Processing Webhook for Alert - $($Request.Body.alertUID) -"
 
+#Respond Request Ok
+Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [HttpStatusCode]::Accepted
+        Body       = 'Request accepted. Processing in the background.'
+    })
+
 #Halo Vars
 $HaloClientID = $env:HaloClientID
 $HaloClientSecret = $env:HaloClientSecret
@@ -390,7 +396,7 @@ if ($Email) {
 
 
 # Associate values to output bindings by calling 'Push-OutputBinding'.
-Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-        StatusCode = [HttpStatusCode]::OK
-        Body       = ''
-    })
+#Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        #StatusCode = [HttpStatusCode]::OK
+        #Body       = ''
+    #})
