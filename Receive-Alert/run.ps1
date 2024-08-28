@@ -235,8 +235,6 @@ if ($Email) {
             Write-Host "Adding ticket entry $ActionUpdate"
         }
     }
-
-    Start-Sleep -Seconds 5
     
     if ($Request.Body.resolvedAlert -eq "true") {
         Write-Host "Resolved Closing $ticketidHalo"
@@ -250,8 +248,6 @@ if ($Email) {
             }
             $null = Set-HaloTicket -Ticket $TicketUpdate
 
-            Start-Sleep -Seconds 5
-
             $Actions = Get-HaloAction -TicketID $TicketID
 
             # Mass review logic
@@ -263,8 +259,6 @@ if ($Email) {
                 }
                 Set-HaloAction -Action $ReviewData
             }
-        
-            Start-Sleep -Seconds 5
 
             $dateInvoice = (get-date)
             $invoice = @{ 
