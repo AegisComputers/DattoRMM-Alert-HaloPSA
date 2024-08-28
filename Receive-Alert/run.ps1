@@ -384,11 +384,3 @@ if ($Email) {
 } else {
         Write-Host "No alert found"
 }
-
-
-
-# Associate values to output bindings by calling 'Push-OutputBinding'.
-#Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-        #StatusCode = [HttpStatusCode]::OK
-        #Body       = ''
-    #})
