@@ -1,34 +1,46 @@
-bin
-obj
-csx
-.vs
-edge
-Publish
+# Build artifacts
+bin/
+obj/
+csx/
+.vs/
+edge/
+Publish/
 
+# User-specific files
 *.user
 *.suo
+
+# Configuration files
 *.cscfg
-*.Cache
 project.lock.json
-
-/packages
-/TestResults
-
-/tools/NuGet.exe
-/App_Data
-/secrets
-/data
-.secrets
 appsettings.json
 local.settings.json
 
-node_modules
-dist
+# Cache files
+*.Cache
 
-# Local python packages
+# Package directories
+/packages/
+node_modules/
+dist/
+
+# Test results
+/TestResults/
+
+# Tools and utilities
+/tools/NuGet.exe
+
+# Data and secrets
+/App_Data/
+/secrets/
+/data/
+.secrets
+
+# Python-specific ignores
+# Local packages
 .python_packages/
 
-# Python Environments
+# Virtual environments
 .env
 .venv
 env/
