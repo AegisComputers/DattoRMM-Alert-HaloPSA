@@ -22,3 +22,6 @@ foreach ($entity in $entities) {
         Write-Host "Removed entity with RowKey: $($entity.RowKey) from PartitionKey: $($entity.PartitionKey)"
     }
 }
+
+# Log the end time
+Write-Output "TimerTrigger function completed at: $(Get-Date)"
