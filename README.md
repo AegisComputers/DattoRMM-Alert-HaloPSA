@@ -40,6 +40,7 @@ These variables are required to configure the script:
 - **`HaloCustomAlertTypeField`:** The ID of the custom field you created in Halo for tracking alert types.
 - **`HaloTicketType`:** The ID for the type of ticket to create (found by navigating to `/config/tickets/tickettype` in Halo).
 - **`HaloRecurringStatus`:** Status to assign to tickets when they reoccur.
+- **`strKey`:** Azure Storage Table Key.
 
 > [!IMPORTANT]
 > Incorrect configuration of these variables, particularly API credentials and IDs, can lead to failures in ticket creation, missed alerts, or unauthorized access issues. Double-check each value before deployment.
