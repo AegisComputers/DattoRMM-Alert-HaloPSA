@@ -1,3 +1,5 @@
+param($Timer)  # Accept the Timer trigger as a parameter
+
 # Set environment variables and local variables
 $storageAccountName = "dattohaloalertsstgnirab"
 $storageAccountKey = $env:strKey
