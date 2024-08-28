@@ -1,3 +1,4 @@
+
 <h1>DattoRMM-Alerts-HaloPSA</h1>
 
 <p>This repository contains a script that takes <strong>Datto RMM Alert Webhooks</strong> and sends them to <strong>Halo PSA</strong>. It is a heavily updated version of <a href="https://github.com/lwhitelock/DattoRMM-Alert-HaloPSA">lwhitelock's DattoRMM-Alert-HaloPSA</a> with bespoke modifications made to match specific internal structures.</p>
@@ -66,22 +67,22 @@
 <ol>
 <li>Find the monitor you want to edit in Datto RMM.</li>
 <li>Set the webhook URL to the Function URL retrieved earlier.</li>
-<li><p>Use the following JSON as the body of the webhook:
-<code>json
-{
-    "troubleshootingNote": "Refer to ITG for related information",
-    "docURL": "url here",
-    "showDeviceDetails": true,
-    "showDeviceStatus": false,
-    "showAlertDetails": true,
-    "resolvedAlert": "false",
-    "dattoSiteDetails": "[sitename]",
-    "alertUID": "[alert_uid]",
-    "alertMessage": "[alert_message]",
-    "platform": "[platform]"
-}
-</code></p></li>
-<li><p>Save the monitor and test it to ensure proper functionality before applying the webhook to additional monitors.</p></li>
+<li>Use the following JSON as the body of the webhook:</li>
+
+    {
+        "troubleshootingNote": "Refer to ITG for related information",
+        "docURL": "url here",
+        "showDeviceDetails": true,
+        "showDeviceStatus": false,
+        "showAlertDetails": true,
+        "resolvedAlert": "false",
+        "dattoSiteDetails": "[sitename]",
+        "alertUID": "[alert_uid]",
+        "alertMessage": "[alert_message]",
+        "platform": "[platform]"
+    }
+
+<p>Save the monitor and test it to ensure proper functionality before applying the webhook to additional monitors.</p>
 </ol>
 
 <p>You can customize individual sections of the webhook, such as toggling the details, adding documentation URLs, or including troubleshooting notes for technicians.</p>
