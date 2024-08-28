@@ -262,6 +262,10 @@
                             "value": "~3"
                         },
                         {
+                            "name": "strKey",
+                            "value": ""
+                        },
+                        {
                             "name": "DattoURL",
                             "value": "[concat('@Microsoft.KeyVault(SecretUri=https://',variables('uniqueResourceNameBase'), '.vault.azure.net/secrets/DattoURL)')]"
                         },
