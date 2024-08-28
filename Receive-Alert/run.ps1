@@ -61,7 +61,7 @@ $PriorityHaloMap = @{
 }
 
 #AlertWebhook Body
-$AlertWebhook = $Request.Body # | ConvertTo-Json -Depth 100
+$AlertWebhook = $Request.Body
 
 $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
 
@@ -288,7 +288,7 @@ if ($Email) {
             Write-Host "Creating Ticket"
             $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 
-            ### Logic to send the email to the user asking them to clean up from space from Halo using email helper class and $ticket var
+            # Function to send the email to the user asking them to clean up from space from Halo using email helper class and $ticket var
 
             FindAndSendHaloResponse -Username $Username -ClientID $HaloClientDattoMatch -TicketId $ticket.id -EmailMessage "You have less than 10% local storage space left. Deleting downloaded files, emptying recycle bin or making large files cloud only with One Drive could free up space. If you are unable to resolve this please respond to this email"
             
