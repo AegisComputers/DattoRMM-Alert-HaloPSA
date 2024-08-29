@@ -316,7 +316,7 @@ function Get-DRMMAlertHistorySection {
 
     $HTMLOpenAlerts = $ParsedOpenAlerts | Sort-Object Created -desc | convertto-html -Fragment
     $HTMLParsedOpenAlerts = [System.Web.HttpUtility]::HtmlDecode(((($HTMLOpenAlerts) -replace '<table>', $AlertsTableStyle) -replace '<td>', $AlertsTableTDStyle))
-    $HTMLParsedOpenAlerts = "<div style='color: #ffffff;'>$HTMLParsedOpenAlerts</div>"
+    $HTMLParsedOpenAlerts = "<div style='color: #ffffff;'><style> td {color: #ffffff;} </style>$HTMLParsedOpenAlerts</div>"
 
     $ParsedResolvedAlerts = $DeviceResolvedAlerts | select-object @{n = 'View'; e = { "<a class=`"button-a button-a-primary`" target=`"_blank`" href=`"https://$($DattoPlatform)rmm.centrastage.net/alert/$($_.alertUid)`" style=`"background: #333333; border: 1px solid #000000; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 4px;`">View</a>" } },
     @{n = 'Priority'; e = { $_.priority } },
@@ -326,7 +326,7 @@ function Get-DRMMAlertHistorySection {
 
     $HTMLResolvedAlerts = $ParsedResolvedAlerts | Sort-Object Created -desc | select-object -first 10 | convertto-html -Fragment
     $HTMLParsedResolvedAlerts = [System.Web.HttpUtility]::HtmlDecode(((($HTMLResolvedAlerts) -replace '<table>', $AlertsTableStyle) -replace '<td>', $AlertsTableTDStyle))
-    $HTMLParsedResolvedAlerts = "<div style='color: #ffffff;'>$HTMLParsedResolvedAlerts</div>"
+    $HTMLParsedResolvedAlerts = "<div style='color: #ffffff;'><style> td {color: #ffffff;} </style>$HTMLParsedResolvedAlerts</div>"
 
     $AlertHistoryHTML = @"
     <!-- Alert Details : BEGIN -->
