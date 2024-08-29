@@ -29,8 +29,8 @@ $entities = Get-AzTableRowAll -Table $table
 
 foreach ($entity in $entities) {
     try {
-        # Convert entity timestamp to DateTime object and ensure it's in UTC
-        $entityTimestamp = [datetime]$entity.Timestamp.ToUniversalTime()
+        # Convert entity timestamp (DateTimeOffset) to UTC DateTime object
+        $entityTimestamp = $entity.TableTimestamp.UtcDateTime
 
         if ($entityTimestamp -lt $thresholdDate) {
             # Remove rows older than the threshold
@@ -39,7 +39,7 @@ foreach ($entity in $entities) {
         }
     }
     catch {
-        Write-Error "Failed to remove entity with RowKey: $($entity.RowKey) from PartitionKey: $($entity.PartitionKey). Error: $_"
+        Write-Error "Failed to process entity with RowKey: $($entity.RowKey) from PartitionKey: $($entity.PartitionKey). Error: $_"
     }
 }
 
