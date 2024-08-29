@@ -322,9 +322,6 @@ Function Get-AlertEmailBody($AlertWebhook) {
     $AlertMessage = $AlertWebhook.alertMessage
     $DattoPlatform = $AlertWebhook.platform
 
-
-
-
     $AlertTypesLookup = @{
         perf_resource_usage_ctx   = 'Resource Monitor'
         comp_script_ctx           = 'Component Monitor'
@@ -337,8 +334,6 @@ Function Get-AlertEmailBody($AlertWebhook) {
         antivirus_ctx             = 'Antivirus'
         custom_snmp_ctx           = 'SNMP'
     }
-
-
 
     $params = @{
         Url       = $DattoURL
