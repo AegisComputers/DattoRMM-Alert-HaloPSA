@@ -107,4 +107,3 @@ function Find-DattoAlertHaloClient {
 
     return $HaloClientID
 }
-

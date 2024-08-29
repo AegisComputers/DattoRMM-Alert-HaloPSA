@@ -56,8 +56,6 @@ function Get-HaloUserEmail {
     }
 }
 
-
-
 <#
 .SYNOPSIS
 Sends an email response via Halo for a specific ticket.
@@ -135,7 +133,6 @@ function Send-HaloEmailResponse {
     }
 }
 
-
 <#
 .SYNOPSIS
 Sends an email response via Halo for a specific ticket.
@@ -211,7 +208,6 @@ function FindAndSendHaloResponse {
         # Return $false to indicate failure
     }
 }
-
 
 # Exporting Module Members
 Export-ModuleMember -Function Get-HaloUserEmail, Send-HaloEmailResponse, FindAndSendHaloResponse

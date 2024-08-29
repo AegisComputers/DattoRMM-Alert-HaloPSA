@@ -370,6 +370,4 @@ function Get-DRMMAlertHistorySection {
     
     $Sections.add($AlertHistorySection)
     
-
-
 }
