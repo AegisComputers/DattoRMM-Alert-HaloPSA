@@ -175,7 +175,7 @@ if ($Email) {
         summary          = $TicketSubject
         tickettype_id    = 8
         details_html     = $HtmlBody
-        DattoAlertState  = 0
+        DattoAlertState = 0
         site_id          = $HaloSiteIDDatto
         assets           = @(@{id = $HaloDevice.did })
         priority_id      = $HaloPriority

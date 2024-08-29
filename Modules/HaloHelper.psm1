@@ -24,86 +24,51 @@ function Invoke-HaloReport {
 
 function Find-DattoAlertHaloSite {
     param (
-        [string]$DattoSiteName
+        $DattoSiteName
     )
+    $dattoLookupString = $DattoSiteName
 
-    # Validate input
-    if (-not $DattoSiteName) {
-        throw "DattoSiteName cannot be null or empty."
-    }
-
-    # Split DattoSiteName into Site and Customer components
-    $dataSiteDetails = $DattoSiteName -split '[()]'
-    if ($dataSiteDetails.Count -lt 2) {
-        throw "DattoSiteName format is invalid. Expected format: '<site>(<Customer>)'."
-    }
-
-    $DattoSite = $dataSiteDetails[0].Trim()
-    $DattoCustomer = $dataSiteDetails[1].Trim()
-
-    # Retrieve Halo Client ID
-    $haloClient = Get-HaloClient -Search $DattoCustomer
-    if (-not $haloClient) {
-        throw "Halo client '$DattoCustomer' not found."
-    }
-    $HaloClientID = $haloClient[0].id
-
-    # Try to find the site by the specific name
-    $SiteInfo = Get-HaloSite -Search $DattoSite -ClientID $HaloClientID
-
-    if ($SiteInfo) {
-        Write-Host "Found site with client ID: $HaloClientID"
-        return $SiteInfo.id
-    }
-
-    # If site not found by name, attempt to find by customer
-    $SiteInfo = Get-HaloSite -Search $DattoCustomer -ClientID $HaloClientID
-    if ($SiteInfo) {
-        Write-Host "No site found by name. Defaulting to search by customer: $DattoCustomer"
-        
-        $HeadOfficeSite = $SiteInfo | Where-Object { $_.ClientSite_Name -match "Head Office" }
-        if ($HeadOfficeSite) {
-            Write-Host "Head Office found."
-            return $HeadOfficeSite.id
+    #Process based on naming scheme in Datto <site>(<Customer>)
+    $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
+    $DattoSite = $dataSiteDetails[0] 
+    $DattoCustomer = $dataSiteDetails[1] 
+    $HaloClientID = (Get-HaloClient -Search $DattoCustomer)[0].id
+    #Does <site> exist in Halo if not select <Customer> and select the first ID
+    if ($SiteInfo = Get-HaloSite -Search $dattosite -ClientID $HaloClientID) {
+        Write-Host "Found Site with Client id of $($HaloClientID)"
+        $HaloSiteID = $SiteInfo.id 
+    } elseif ($SiteInfo = Get-HaloSite -Search $DattoCustomer) {
+        Write-Host "No Site found defaulting to Customer for site lookup. Will Map to Site named : Head Office IF existing"
+        if ($siteDrillD = ($siteinfo | Where-Object {$_.ClientSite_Name -match "Head Office"})) {
+            Write-Host "Head Office found"
+            $HaloSiteID = $siteDrillD.id
         } else {
-            Write-Host "Head Office not found. Defaulting to the first site found."
-            return $SiteInfo[0].id
+            Write-Host "Head Office not found. Defaulting to first created site"
+            $HaloSiteID = $SiteInfo[0].id
         }
+    } else {
+        Write-Host "No Valid Site or Customer Found Setting to Aegis Internal"
+	    $HaloSiteID = 286
     }
+    Write-Host "Selected Site Id of $($HaloSiteID)"
 
-    # If no site or customer found, default to a known internal site
-    Write-Host "No valid site or customer found. Defaulting to Aegis Internal."
-    return 286
+    return $HaloSiteID
 }
-
 
 function Find-DattoAlertHaloClient {
     param (
-        [string]$DattoSiteName
+        $DattoSiteName
     )
+    $dattoLookupString = $DattoSiteName
 
-    # Validate input
-    if (-not $DattoSiteName) {
-        throw "DattoSiteName cannot be null or empty."
-    }
+    #Process based on naming scheme in Datto <site>(<Customer>)
+    $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
+    #$DattoSite = $dataSiteDetails[0] 
+    $DattoCustomer = $dataSiteDetails[1] 
+    $HaloClientID = (Get-HaloClient -Search $DattoCustomer)[0].id
+    #Does <site> exist in Halo if not select <Customer> and select the first ID
 
-    # Split DattoSiteName into Site and Customer components
-    $dataSiteDetails = $DattoSiteName -split '[()]'
-    if ($dataSiteDetails.Count -lt 2) {
-        throw "DattoSiteName format is invalid. Expected format: '<site>(<Customer>)'."
-    }
-
-    # Extract customer name
-    $DattoCustomer = $dataSiteDetails[1].Trim()
-
-    # Retrieve Halo Client ID
-    $haloClient = Get-HaloClient -Search $DattoCustomer
-    if (-not $haloClient) {
-        throw "Halo client '$DattoCustomer' not found."
-    }
-    $HaloClientID = $haloClient[0].id
-
-    Write-Host "Selected Client Id of $HaloClientID"
+    Write-Host "Selected Client Id of $($HaloClientID)"
 
     return $HaloClientID
 }
