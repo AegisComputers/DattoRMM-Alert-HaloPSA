@@ -41,7 +41,7 @@ function Find-DattoAlertHaloSite {
         Write-Host "No Site found defaulting to Customer for site lookup. Will Map to Site named : Head Office IF existing"
         if ($siteDrillD = ($siteinfo | Where-Object {$_.ClientSite_Name -match "Head Office"})) {
             Write-Host "Head Office found"
-            $HaloSiteID = $siteDrillD.id
+            $HaloSiteID = $siteDrillD[0].id
         } else {
             Write-Host "Head Office not found. Defaulting to first created site"
             $HaloSiteID = $SiteInfo[0].id
