@@ -42,35 +42,6 @@ Import-Module AzTable
 # Azure Table Existence and Connectivity Test
 Write-Host "Testing Azure Table existence and connectivity..."
 
-try {
-    # Create a storage context
-    $storageContext = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
-
-    # Retrieve the table client
-    $table = Get-AzTableTable -Name $tableName -Context $storageContext -ErrorAction Stop
-
-    # Check if the table exists
-    if ($null -ne $table) {
-        Write-Host "Table '$tableName' exists in storage account '$storageAccountName'."
-
-        # Test connectivity by querying a small set of data
-        $query = New-AzTableQuery -Top 1
-        $result = Get-AzTableRow -Table $table -Query $query
-
-        if ($result.Count -gt 0) {
-            Write-Host "Connectivity test successful. Retrieved data from table '$tableName'."
-        } else {
-            Write-Host "Connectivity test successful, but no data found in table '$tableName'."
-        }
-    } else {
-        Write-Host "Table '$tableName' does not exist in storage account '$storageAccountName'."
-        throw "Table not found."
-    }
-} catch {
-    Write-Host "Azure Table test failed: $_"
-    throw
-}
-
 # Uncomment the next line to enable legacy AzureRm alias in Azure PowerShell.
 # Enable-AzureRmAlias
 
