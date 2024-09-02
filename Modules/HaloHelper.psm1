@@ -36,7 +36,7 @@ function Find-DattoAlertHaloSite {
     #Does <site> exist in Halo if not select <Customer> and select the first ID
     if ($SiteInfo = Get-HaloSite -Search $dattosite -ClientID $HaloClientID) {
         Write-Host "Found Site with Client id of $($HaloClientID)"
-        $HaloSiteID = $SiteInfo.id 
+        $HaloSiteID = $SiteInfo[0].id 
     } elseif ($SiteInfo = Get-HaloSite -Search $DattoCustomer) {
         Write-Host "No Site found defaulting to Customer for site lookup. Will Map to Site named : Head Office IF existing"
         if ($siteDrillD = ($siteinfo | Where-Object {$_.ClientSite_Name -match "Head Office"})) {
