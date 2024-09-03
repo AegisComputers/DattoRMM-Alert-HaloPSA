@@ -283,8 +283,8 @@ function Get-DRMMAlertHistorySection {
         $DattoPlatform      
     )
 
-    $AlertsTableStyle = '<table style="border-width: 1px; border-style: solid; border-color: white; border-collapse: collapse; table-layout: auto !important;" width=100%; color: #ffffff;>'
-    $AlertsTableTDStyle = '<td style = "border-width: 1px; padding: 3px; border-style: solid; border-color: white; overflow-wrap: break-word"; width: auto; color: #ffffff;>'
+    $AlertsTableStyle = '<table style="border-width: 1px; color: #ffffff; border-style: solid; border-color: white; border-collapse: collapse; table-layout: auto !important;" width=100%;>'
+    $AlertsTableTDStyle = '<td style = "border-width: 1px; padding: 3px; color: #ffffff; border-style: solid; border-color: white; overflow-wrap: break-word"; width=auto;>'
 
     [System.Collections.Generic.List[PSCustomObject]]$AllAlerts = @()
     $DeviceOpenAlerts = Get-DrmmDeviceOpenAlerts -deviceUid $Alert.alertSourceInfo.deviceUid
