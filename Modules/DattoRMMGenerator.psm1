@@ -57,11 +57,6 @@ function Get-DRMMAlertDetailsSection {
             <br />
             <h3>Alert Message:</h3>
             <p style="margin: 0 0 10px; color: #ffffff">
-                <style>
-                    p td {
-                        color: #ffffff;
-                    }
-                </style>
             $(Get-AlertDescription -Alert $Alert)
             $($Alert.diagnostics)
             </p>
@@ -334,19 +329,9 @@ function Get-DRMMAlertHistorySection {
         <td
             style="padding: 10px 10px 0px 10px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #ffffff;">
             <h3>Open Alerts</h3>
-            <style>
-                td {
-                    color: #ffffff;
-                }
-            </style>
             $($HTMLParsedOpenAlerts)
             <br />
             <h3>Recent Resolved Alerts</h3>
-            <style>
-                td {
-                    color: #ffffff;
-                }
-            </style>
             $($HTMLParsedResolvedAlerts)
             <br />
         </td>

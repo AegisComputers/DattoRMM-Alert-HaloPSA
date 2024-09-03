@@ -162,8 +162,9 @@ function Get-HTMLBody {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
     <style type="text/css">
-      body, table, td {
+      body, table, td, th, tr {
         font-family: Helvetica, Arial, sans-serif !important;
+        color: #ffffff !important;
       }
       .ExternalClass {
         width: 100%;
@@ -175,10 +176,10 @@ function Get-HTMLBody {
         text-decoration: none;
       }
       * {
-        color: inherit;
+        color: #ffffff !important;
       }
       a[x-apple-data-detectors], u+#body a, #MessageViewBody a {
-        color: inherit;
+        color: #ffffff !important;
         text-decoration: none;
         font-size: inherit;
         font-family: inherit;
@@ -194,14 +195,16 @@ function Get-HTMLBody {
         mso-table-rspace: 0pt;
         border-spacing: 0px;
         border-collapse: collapse;
+        color: #ffffff !important;
       }
       table:not([class^=s-]) td {
         border-spacing: 0px;
         border-collapse: collapse;
+        color: #ffffff !important;
       }
       /* Added rule for white text color */
-      table, table tr, table td {
-        color: #ffffff !important;
+      table, table tbody tr, table tbody td {
+          color: #ffffff !important;
       }
       @media screen and (max-width: 1800px) {
         .row-responsive.row {
