@@ -4,7 +4,7 @@ using namespace Microsoft.Azure.Cosmos.Table
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
 
-Write-Host "Processing Webhook for Alert - $($Request.Body.alertUID) -"
+Write-Host "Processing Webhook for Alert with the UID of - $($Request.Body.alertUID) -"
 
 #Respond Request Ok
 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
@@ -138,7 +138,7 @@ if ($Email) {
     # Find the Halo site ID associated with the Datto site name provided in the site details
     $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
 
-    Write-Host ($RSiteDetails)
+    Write-Host ("Found Halo site with ID - $($RSiteDetails)")
 
     # Store the Datto site details from the request body into a variable
     $dattoLookupString = $Request.Body.dattoSiteDetails
@@ -151,11 +151,11 @@ if ($Email) {
 
     $HaloClientDattoMatch = $HaloClientID
     
-    Write-Host "Client ID in Halo $($HaloClientDattoMatch)"
+    Write-Host "Client ID in Halo - $($HaloClientDattoMatch)"
     
     $Contracts = (Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects)
 
-    Write-Host "Contracts for client ID are $($Contracts)"
+    Write-Host "Contracts for client ID - $($Contracts)"
 
     $FilteredContracts = $Contracts | Where-Object {
         $_.ref -like '*M' -and $_.site_id -eq $HaloSiteIDDatto
@@ -164,12 +164,10 @@ if ($Email) {
     # Sort the filtered contracts by 'start_date' in descending order
     $LatestContract = $FilteredContracts | Sort-Object start_date -Descending | Select-Object -First 1
 
-    Write-Host $LatestContract
-
     # Extract and display the ID of the latest contract based on the start date
     $LatestContractId = $LatestContract.id
 
-    Write-Host $LatestContract.id
+    Write-Host "The latest contract is - $($LatestContract) with an id of $($LatestContract.id)" 
 
     $HaloTicketCreate = @{
         summary          = $TicketSubject
