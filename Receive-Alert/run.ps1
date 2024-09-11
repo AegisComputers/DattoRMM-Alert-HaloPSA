@@ -377,7 +377,7 @@ if ($Email) {
         }
     }
 
-    $HaloTicketCreate | Out-String | Write-Host
+    #$HaloTicketCreate | Out-String | Write-Host #Enable for Debugging
 
 } else {
         Write-Host "No alert found"
