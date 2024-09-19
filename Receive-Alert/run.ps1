@@ -352,7 +352,7 @@ if ($Email) {
                 }
 
                 # Perform an action if the alert count exceeds a threshold
-                $threshold = 5
+                $threshold = 3
                 if ($entity.AlertCount -ge $threshold) {
                     
                     Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
