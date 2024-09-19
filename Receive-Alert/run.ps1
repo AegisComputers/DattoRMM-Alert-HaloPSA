@@ -288,7 +288,7 @@ if ($Email) {
 
             # Function to send the email to the user asking them to clean up from space from Halo using email helper class and $ticket var
 
-            FindAndSendHaloResponse -Username $Username -ClientID $HaloClientDattoMatch -TicketId $ticket.id -EmailMessage "You have less than 10% local storage space left. Deleting downloaded files, emptying recycle bin or making large files cloud only with One Drive could free up space. If you are unable to resolve this please respond to this email"
+            FindAndSendHaloResponse -Username $Username -ClientID $HaloClientDattoMatch -TicketId $ticket.id -EmailMessage "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>"
             
         } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
 
