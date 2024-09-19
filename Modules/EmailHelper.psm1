@@ -108,15 +108,11 @@ function Send-HaloEmailResponse {
         $ActionUpdate = @{
             ticket_id             = $TicketId                 # ID of the ticket to update
             outcome               = "Email User"              # Description of the outcome
-            outcome_id            = 16                        # Presumed identifier for the "Email User" outcome
-            emailfrom             = "IT Support"              # Sender's display name
-            replytoaddress        = "helpdesk@aegis-group.co.uk" # Reply-to email address
+            outcome_id            = 72                        # Presumed identifier for the "Email User" outcome
+            new_status            = 20                        # end status of ticket
             emailto               = $EmailAddress             # Recipient's email address
-            note                  = $EmailMessage             # The message body to be sent
-            actionarrivaldate     = $dateArrival              # The date and time the action started
-            actioncompletiondate  = $dateEnd                  # The date and time the action completed
-            action_isresponse     = $false                    # Flag indicating whether this action is a response
-            validate_response     = $false                    # Flag indicating whether to validate the response
+            note_html             = $EmailMessage             # The message body to be sent
+            timetaken             = 0.016314166666666668      # 1 minute of time
             sendemail             = $true                     # Flag to actually send the email
         }
 
