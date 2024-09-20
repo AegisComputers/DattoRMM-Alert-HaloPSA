@@ -39,12 +39,6 @@ Import-Module Az.Accounts
 Import-Module Az.Storage
 Import-Module AzTable
 
-# Azure Table Existence and Connectivity Test
-Write-Host "Testing Azure Table existence and connectivity..."
-
-# Uncomment the next line to enable legacy AzureRm alias in Azure PowerShell.
-# Enable-AzureRmAlias
-
 # Log the end time for reference
 $coldEndTime = Get-Date
 $coldTotalTime = $coldEndTime - $coldStartTime
@@ -52,4 +46,7 @@ Write-Host "Function App cold start completed at: $coldEndTime"
 Write-Host "Total cold start time: $($coldTotalTime.TotalSeconds) seconds"
 
 # You can also define functions or aliases that can be referenced in any of your PowerShell functions.
+
+# Uncomment the next line to enable legacy AzureRm alias in Azure PowerShell.
+# Enable-AzureRmAlias
 
