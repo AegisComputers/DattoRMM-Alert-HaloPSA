@@ -417,8 +417,6 @@ Function Get-AlertEmailBody($AlertWebhook) {
 
     $Alert = Get-DrmmAlert -alertUid $AlertID
 
-    Write-Host $Alert
-
     if ($Alert) {
         [System.Collections.Generic.List[PSCustomObject]]$Sections = @()
 
