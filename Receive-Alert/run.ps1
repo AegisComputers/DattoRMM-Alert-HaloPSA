@@ -270,110 +270,25 @@ if ($Email) {
         # Handle Specific Ticket responses based on ticket subject type
         # Check if the alert message contains the specific disk usage alert for the C: drive
         if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
-        
-            # Perform action here
-            Write-Host "Alert detected for high disk usage on C: drive. Taking action..." 
 
-            ### Logic to get username of user for device from Datto here
-            $AlertUID = $Request.Body.alertUID
+            Handle-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
 
-            $AlertDetails = Get-DrmmAlert -alertUid $AlertUID
-            $Device = Get-DrmmDevice -deviceUid $AlertDetails.alertSourceInfo.deviceUid
-
-            $LastUser = $Device.lastLoggedInUser
-            $Username = $LastUser -replace '^[^\\]*\\', ''
-
-            Write-Host "Creating Ticket"
-            $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
-
-            # Function to send the email to the user asking them to clean up from space from Halo using email helper class and $ticket var
-
-            FindAndSendHaloResponse -Username $Username -ClientID $HaloClientDattoMatch -TicketId $ticket.id -EmailMessage "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>"
-            
         } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
 
-            Write-Host "Alert detected for Hyper-V Replication. Taking action..." 
+            Handle-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
 
-            # Set the time zone to UTC
-            $TimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("UTC")
-
-            # Get the current time in UTC
-            $CurrentTimeUTC = [System.DateTime]::UtcNow
-
-            # Define the UK time zone
-            $UKTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("GMT Standard Time")
-
-            # Convert the current time to UK time
-            $CurrentTimeUK = [System.TimeZoneInfo]::ConvertTimeFromUtc($CurrentTimeUTC, $UKTimeZone)
-
-            # Get the hour part of the current time in UK time zone
-            $CurrentHourUK = $CurrentTimeUK.Hour
-            $CurrentMinuteUK = $CurrentTimeUK.Minute
-
-            # Check if the current time is between 9 AM and 5:30 PM (09:00 and 17:30)
-            $StartTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 9, 0, 0)
-            $EndTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 17, 30, 0)
-
-            if ($CurrentTimeUK -ge $StartTime -and $CurrentTimeUK -lt $EndTime) {
-                Write-Output "The current time is between 9 AM and 5:30 PM UK time. A ticket will be created!"
-                Write-Host "Creating Ticket"
-                $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
-            } else {
-                Write-Output "The current time is outside of 9 AM and 5:30 PM UK time. No Ticket will be created!"
-            }
-        
         } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
 
-            Write-Host "Alert detected for Patching. Taking action..." 
+            Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
 
-            $AlertID = $AlertWebhook.alertUID
-            $AlertDRMM = Get-DrmmAlert -alertUid $AlertID
-
-            if ($AlertDRMM -ne $Null) {
-                $Device = Get-DrmmDevice -deviceUid $AlertDRMM.alertSourceInfo.deviceUid
-                $DeviceHostname = $Device.hostname
-
-                $partitionKey = "DeviceAlert"
-                $rowKey = $DeviceHostname
-
-                $table = Get-StorageTable -tableName $tableName
-                $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
-
-                if ($entity -eq $null) {
-                    # New device hostname, initialize alert count
-                    $entity = [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]::new($partitionKey, $rowKey)
-                    $entity.Properties.Add("AlertCount", [Microsoft.Azure.Cosmos.Table.EntityProperty]::GeneratePropertyForInt(1))
-                    # Insert or merge the entity
-                    InsertOrMergeEntity -table $table -entity $entity
-                } else {
-                    # Existing device hostname, increment alert count
-                    $entity.AlertCount++
-                    Update-AzTableRow -Table $table -entity $entity
-                }
-
-                # Perform an action if the alert count exceeds a threshold
-                $threshold = 3
-                if ($entity.AlertCount -ge $threshold) {
-                    
-                    Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
-
-                    Write-Host "Creating Ticket"
-                    $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
-
-                    remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
-                }
-            } else {
-                Write-Host "Alert missing in Datto RMM no further action...." 
-            }           
         } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
-            Write-Host "Backup Exec Alert Detected"
 
-            #Logic here to find BKE related email/ticket
-            Write-Host "Creating Ticket"
-            $Ticket = New-HaloTicket -Ticket $HaloTicketCreate   
-        }  else {
-            Write-Host "Creating Ticket without additonal processing!"
-            $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+            Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
+
+        } else {
+
+            Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+
         }
     }
 
