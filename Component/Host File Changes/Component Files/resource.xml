@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<component info="CentraStage Component">
+    <general>
+        <name>HOSTS Integrity Monitor - Hash Check [WIN]</name>
+        <category>monitors</category>
+        <description>Monitors the Windows HOSTS file and alerts if it has been edited in the last 24 hours. It is recommended to set the interval for this monitor at around 12 hours to prevent re-raising of alerts.</description>
+        <uid>fd91cf65-67c6-4a99-8736-ad26117449c6</uid>
+        <hash/>
+        <version>1</version>
+        <timeout>3600</timeout>
+        <securityLevel>1</securityLevel>
+        <installType>powershell</installType>
+    </general>
+</component>
