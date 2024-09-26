@@ -285,6 +285,10 @@ if ($Email) {
 
             Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
 
+        } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
+
+            Handle-HostsAlert -HaloTicketCreate $HaloTicketCreate
+
         } else {
 
             Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate

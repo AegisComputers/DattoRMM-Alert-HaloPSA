@@ -116,6 +116,15 @@ function Handle-BackupExecAlert {
     $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 }
 
+
+function Handle-HostsAlert {
+    param ($HaloTicketCreate)
+
+    Write-Host "Hosts Alert Detected"
+    Write-Host "Creating Ticket"
+    $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+}
+
 function Handle-DefaultAlert {
     param ($HaloTicketCreate)
 
