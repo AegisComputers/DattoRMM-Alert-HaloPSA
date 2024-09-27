@@ -96,7 +96,7 @@ function Handle-PatchMonitorAlert {
             Update-AzTableRow -Table $table -entity $entity
         }
 
-        $threshold = 3
+        $threshold = 2
         if ($entity.AlertCount -ge $threshold) {
             Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
             Write-Host "Creating Ticket"
