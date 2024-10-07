@@ -111,6 +111,7 @@ function Get-AlertDescription {
         'srvc_status_ctx' { $Result = "$($AlertContext.serviceName) - $($AlertContext.status)" }
         'antivirus_ctx' { $Result = "$($AlertContext.productName) - $($AlertContext.status)" }
         'custom_snmp_ctx' { $Result = "$($AlertContext.displayName) - $($AlertContext.currentValue)" }
+        'endpoint_security_threat_ctx' { $Result = "$($AlertContext.description)" }
         default { $Result = "Unknown Monitor Type" }
     }
 
