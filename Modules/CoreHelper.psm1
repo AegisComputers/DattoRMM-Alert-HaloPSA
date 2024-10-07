@@ -401,6 +401,7 @@ Function Get-AlertEmailBody($AlertWebhook) {
         srvc_status_ctx           = 'Service Status'
         antivirus_ctx             = 'Antivirus'
         custom_snmp_ctx           = 'SNMP'
+        endpoint_security_threat_ctx = "Endpoint Security"
     }
 
     $params = @{
