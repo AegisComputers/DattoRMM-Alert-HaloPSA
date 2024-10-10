@@ -393,16 +393,16 @@ Function Get-AlertEmailBody($AlertWebhook) {
     $DattoPlatform = $AlertWebhook.platform
 
     $AlertTypesLookup = @{
-        perf_resource_usage_ctx   = 'Resource Monitor'
-        comp_script_ctx           = 'Component Monitor'
-        perf_mon_ctx              = 'Performance Monitor'
-        online_offline_status_ctx = 'Offline'
-        eventlog_ctx              = 'Event Log'
-        perf_disk_usage_ctx       = 'Disk Usage'
-        patch_ctx                 = 'Patch Monitor'
-        srvc_status_ctx           = 'Service Status'
-        antivirus_ctx             = 'Antivirus'
-        custom_snmp_ctx           = 'SNMP'
+        perf_resource_usage_ctx      = 'Resource Monitor'
+        comp_script_ctx              = 'Component Monitor'
+        perf_mon_ctx                 = 'Performance Monitor'
+        online_offline_status_ctx    = 'Offline'
+        eventlog_ctx                 = 'Event Log'
+        perf_disk_usage_ctx          = 'Disk Usage'
+        patch_ctx                    = 'Patch Monitor'
+        srvc_status_ctx              = 'Service Status'
+        antivirus_ctx                = 'Antivirus'
+        custom_snmp_ctx              = 'SNMP'
         endpoint_security_threat_ctx = "Endpoint Security"
     }
 
@@ -411,10 +411,6 @@ Function Get-AlertEmailBody($AlertWebhook) {
         Key       = $DattoKey
         SecretKey = $DattoSecretKey
     }
-
-    Write-Host $DattoURL
-    Write-Host $DattoKey
-    Write-Host $DattoSecretKey
 
     Set-DrmmApiParameters @params
 
