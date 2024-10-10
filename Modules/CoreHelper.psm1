@@ -137,6 +137,7 @@ function Get-AlertHaloType {
         'srvc_status_ctx' { $Result = "Service Alert - $($AlertContext.serviceName)" }
         'antivirus_ctx' { $Result = "Anti Virus Alert $($AlertContext.productName)" }
         'custom_snmp_ctx' { $Result = "SNMP Alert - $($AlertContext.displayName)" }
+        'endpoint_security_threat_ctx' { $Result = "$($AlertContext.description)" }
         default { $Result = "Unknown Monitor Type" }
     }
     
