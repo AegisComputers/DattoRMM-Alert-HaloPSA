@@ -263,7 +263,7 @@ if ($Email) {
                 lines = @(@{entity_type = "labour";ticket_id = $TicketID})
             }
 
-            New-HaloInvoice -Invoice $invoice 
+            $supress = New-HaloInvoice -Invoice $invoice 
         }
         
     } else {
