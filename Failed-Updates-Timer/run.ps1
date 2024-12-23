@@ -31,14 +31,12 @@ foreach ($entity in $entities) {
     try {
         # Convert entity timestamp (DateTimeOffset) to UTC DateTime object
         $entityTimestamp = $entity.TableTimestamp.UtcDateTime
-
         if ($entityTimestamp -lt $thresholdDate) {
             # Remove rows older than the threshold
             Remove-AzTableRow -Table $table -PartitionKey $entity.PartitionKey -RowKey $entity.RowKey
             Write-Host "Removed entity with RowKey: $($entity.RowKey) from PartitionKey: $($entity.PartitionKey)"
         }
-    }
-    catch {
+    } catch {
         Write-Error "Failed to process entity with RowKey: $($entity.RowKey) from PartitionKey: $($entity.PartitionKey). Error: $_"
     }
 }
