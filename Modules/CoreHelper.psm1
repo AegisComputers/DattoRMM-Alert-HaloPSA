@@ -74,7 +74,6 @@ function Get-HeatMap {
     return $html
 }
 
-
 function Get-DecodedTable {
     param(
         $TableString,
@@ -365,11 +364,9 @@ function Get-HTMLBody {
         $ReturnHtml -join ''
     }
 
-
     $HTML = $HTMLHeader + ($BlockHTML) + $HTMLFooter
 
     return $HTML
-
 
 }
 
