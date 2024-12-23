@@ -145,7 +145,6 @@ if ($Email) {
 
     #Process based on naming scheme in Datto <site>(<Customer>)
     $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
-    #$DattoSite = $dataSiteDetails[0] 
     $DattoCustomer = $dataSiteDetails[1] 
     $HaloClientID = (Get-HaloClient -Search $DattoCustomer)[0].id
 
@@ -299,5 +298,5 @@ if ($Email) {
     #$HaloTicketCreate | Out-String | Write-Host #Enable for Debugging
 
 } else {
-        Write-Host "No alert found"
+        Write-Host "No alert found. This webhook shouldn't be triggered this way except when testing!!!!"
 }
