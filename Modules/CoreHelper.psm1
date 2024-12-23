@@ -107,7 +107,6 @@ function Get-AlertDescription {
         'online_offline_status_ctx' { $Result = "$($AlertContext.status)" }
         'eventlog_ctx' { $Result = "$($AlertContext.logName) - $($AlertContext.type) - $($AlertContext.code) - $($AlertContext.description)" }
         'perf_disk_usage_ctx' { $Result = "$($AlertContext.diskName) - $($AlertContext.freeSpace /1024/1024)GB free of $($AlertContext.totalVolume /1024/1024)GB" }
-        #'patch_ctx' { $Result = "$($AlertContext.result): $($AlertContext.info)" }
         'patch_ctx' { $Result = (Get-WindowsErrorMessage $AlertContext.result) }
         'srvc_status_ctx' { $Result = "$($AlertContext.serviceName) - $($AlertContext.status)" }
         'antivirus_ctx' { $Result = "$($AlertContext.productName) - $($AlertContext.status)" }
@@ -426,18 +425,15 @@ Function Get-AlertEmailBody($AlertWebhook) {
         # Build the alert details section
         Get-DRMMAlertDetailsSection -Sections $Sections -Alert $Alert -Device $Device -AlertDocumentationURL $AlertDocumentationURL -AlertTroubleshooting $AlertTroubleshooting -DattoPlatform $DattoPlatform
 
-
         ## Build the device details section if enabled.
         if ($ShowDeviceDetails -eq $True) {
             Get-DRMMDeviceDetailsSection -Sections $Sections -Device $Device
         }
 
-
         # Build the device status section if enabled
         if ($ShowDeviceStatus -eq $true) {
             Get-DRMMDeviceStatusSection -Sections $Sections -Device $Device -DeviceAudit $DeviceAudit -CPUUDF $CPUUDF -RAMUDF $RAMUDF
         }
-
 
         if ($showAlertDetails -eq $true) {
             Get-DRMMAlertHistorySection -Sections $Sections -Alert $Alert -DattoPlatform $DattoPlatform
