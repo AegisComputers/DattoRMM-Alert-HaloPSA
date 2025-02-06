@@ -278,7 +278,8 @@ if ($Email) {
 
         } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
 
-            Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
+            #Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
+            Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
 
         } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
 
