@@ -1,5 +1,4 @@
 # TicketHandler.ps1
-
 # Set environment variables and local variables
 $storageAccountName = "dattohaloalertsstgnirab"
 $storageAccountKey = $env:strKey
@@ -123,7 +122,6 @@ function Get-OnlineErrorMessage {
     return $onlineMessage
 }
 
-
 function Handle-DiskUsageAlert {
     param (
         $Request,
@@ -183,7 +181,6 @@ function Handle-HyperVReplicationAlert {
     }
 }
 
-
 function Handle-PatchMonitorAlert {
     param (
         $AlertWebhook,
@@ -235,7 +232,6 @@ function Handle-PatchMonitorAlert {
     }
 }
 
-
 function Handle-BackupExecAlert {
     param ($HaloTicketCreate)
 
@@ -243,7 +239,6 @@ function Handle-BackupExecAlert {
     Write-Host "Creating Ticket"
     $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 }
-
 
 function Handle-HostsAlert {
     param ($HaloTicketCreate)
@@ -259,4 +254,3 @@ function Handle-DefaultAlert {
     Write-Host "Creating Ticket without additional processing!"
     $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 }
-
