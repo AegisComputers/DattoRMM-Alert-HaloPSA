@@ -136,6 +136,13 @@ function Handle-HyperVReplicationAlert {
     $UKTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("GMT Standard Time")
     $CurrentTimeUK = [System.TimeZoneInfo]::ConvertTimeFromUtc($CurrentTimeUTC, $UKTimeZone)
 
+    # Check if today is Saturday or Sunday
+    if ($CurrentTimeUK.DayOfWeek -eq [System.DayOfWeek]::Saturday -or $CurrentTimeUK.DayOfWeek -eq [System.DayOfWeek]::Sunday) {
+        Write-Output "Today is $($CurrentTimeUK.DayOfWeek). No ticket will be created on weekends!"
+        return
+    }
+
+    # Define the working hours (adjusted to match the output message, here 9:00 AM)
     $StartTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 9, 0, 0)
     $EndTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 17, 30, 0)
 
@@ -144,9 +151,10 @@ function Handle-HyperVReplicationAlert {
         Write-Host "Creating Ticket"
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
     } else {
-        Write-Output "The current time is outside of 9 AM and 5:30 PM UK time. No Ticket will be created!"
+        Write-Output "The current time is outside of 9 AM and 5:30 PM UK time. No ticket will be created!"
     }
 }
+
 
 function Handle-PatchMonitorAlert {
     param ($AlertWebhook, $HaloTicketCreate, $tableName)
