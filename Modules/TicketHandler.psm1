@@ -110,7 +110,11 @@ function Get-OnlineErrorMessage {
 }
 
 function Handle-DiskUsageAlert {
-    param ($Request, $HaloTicketCreate, $HaloClientDattoMatch)
+    param (
+        $Request,
+        $HaloTicketCreate,
+        $HaloClientDattoMatch
+    )
     
     Write-Host "Alert detected for high disk usage on C: drive. Taking action..." 
 
@@ -123,7 +127,16 @@ function Handle-DiskUsageAlert {
     Write-Host "Creating Ticket"
     $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
 
-    FindAndSendHaloResponse -Username $Username -ClientID $HaloClientDattoMatch -TicketId $ticket.id -EmailMessage "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>"
+    try {
+        FindAndSendHaloResponse -Username $Username `
+            -ClientID $HaloClientDattoMatch `
+            -TicketId $Ticket.id `
+            -EmailMessage "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>" `
+            -ErrorAction Stop
+    }
+    catch {
+        Write-Host "Unable to find user '$Username'. Skipping sending Halo response."
+    }
 }
 
 function Handle-HyperVReplicationAlert {
