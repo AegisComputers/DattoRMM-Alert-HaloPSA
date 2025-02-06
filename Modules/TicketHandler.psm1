@@ -30,13 +30,16 @@ $DattoAlertUIDField = $env:DattoAlertUIDField
 $context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
 $table = Get-StorageTable -Context $context -TableName $tableName
 
-# Function to look up HResult using Win32Exception
+## Global cache for online error lookups
+$global:OnlineErrorCache = @{}
+
 function Get-WindowsErrorMessage {
     param(
         [Parameter(Mandatory = $true)]
         [int]$ErrorCode
     )
 
+    # Check for a custom error message first
     $customErrorMessage = Get-CustomErrorMessage -ErrorCode $ErrorCode
     if ($customErrorMessage) {
         return $customErrorMessage
@@ -47,10 +50,11 @@ function Get-WindowsErrorMessage {
         $exception = New-Object System.ComponentModel.Win32Exception($ErrorCode)
         $errorMessage = $exception.Message
     } catch {
+        Write-Debug "Failed to create Win32Exception for code $ErrorCode. Error: $_"
         $errorMessage = "Unknown error code or not a Win32 error."
     }
 
-    # If no valid message found, attempt to fetch from Microsoft
+    # If the error message is the default message, attempt an online lookup.
     if ($errorMessage -eq "Unknown error code or not a Win32 error.") {
         $onlineErrorMessage = Get-OnlineErrorMessage -ErrorCode $ErrorCode
         if ($onlineErrorMessage) {
@@ -61,7 +65,6 @@ function Get-WindowsErrorMessage {
     return $errorMessage
 }
 
-# Custom mapping for frequent errors
 function Get-CustomErrorMessage {
     param(
         [Parameter(Mandatory = $true)]
@@ -82,32 +85,44 @@ function Get-CustomErrorMessage {
     return $errorDictionary[$ErrorCode]
 }
 
-# Online Error Code Lookup
 function Get-OnlineErrorMessage {
     param(
         [Parameter(Mandatory = $true)]
         [int]$ErrorCode
     )
 
+    # Check cache first
+    if ($global:OnlineErrorCache.ContainsKey($ErrorCode)) {
+        Write-Debug "Returning cached online error for $ErrorCode"
+        return $global:OnlineErrorCache[$ErrorCode]
+    }
+
     # Convert error code to hexadecimal format
     $HexCode = "0x{0:X}" -f $ErrorCode
+    Write-Debug "Looking up online error message for $HexCode"
 
     # Microsoft Learn URL (or any other trusted site for error codes)
     $url = "https://learn.microsoft.com/en-us/search/?terms=$HexCode"
 
     try {
         $response = Invoke-WebRequest -Uri $url -UseBasicParsing
-        # Extract description from page using Regex or parsing
+        # A simple regex to extract a paragraph from the page.
         $match = [regex]::Match($response.Content, "<p>(.*?)</p>")
         if ($match.Success) {
-            return $match.Groups[1].Value
+            $onlineMessage = $match.Groups[1].Value
         } else {
-            return "Online lookup failed or error code not found."
+            $onlineMessage = "Online lookup failed or error code not found."
         }
     } catch {
-        return "Failed to connect to Microsoft or parse the response."
+        Write-Debug "Error during online lookup: $_"
+        $onlineMessage = "Failed to connect to Microsoft or parse the response."
     }
+
+    # Cache the result
+    $global:OnlineErrorCache[$ErrorCode] = $onlineMessage
+    return $onlineMessage
 }
+
 
 function Handle-DiskUsageAlert {
     param (
