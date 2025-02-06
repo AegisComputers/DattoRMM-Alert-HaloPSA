@@ -170,43 +170,56 @@ function Handle-HyperVReplicationAlert {
 
 
 function Handle-PatchMonitorAlert {
-    param ($AlertWebhook, $HaloTicketCreate, $tableName)
+    param (
+        $AlertWebhook,
+        $HaloTicketCreate,
+        $tableName
+    )
 
     Write-Host "Alert detected for Patching. Taking action..."
 
+    # Retrieve the alert details using the provided alert UID.
     $AlertID = $AlertWebhook.alertUID
     $AlertDRMM = Get-DrmmAlert -alertUid $AlertID
 
-    if ($AlertDRMM -ne $Null) {
+    if ($AlertDRMM -ne $null) {
+        # Retrieve the device details and extract the hostname.
         $Device = Get-DrmmDevice -deviceUid $AlertDRMM.alertSourceInfo.deviceUid
         $DeviceHostname = $Device.hostname
 
+        # Define partition and row keys for table storage.
         $partitionKey = "DeviceAlert"
         $rowKey = $DeviceHostname
 
+        # Get the table reference.
         $table = Get-StorageTable -tableName $tableName
         $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
 
         if ($entity -eq $null) {
+            # Create a new entity with an initial AlertCount of 1.
             $entity = [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]::new($partitionKey, $rowKey)
             $entity.Properties.Add("AlertCount", [Microsoft.Azure.Cosmos.Table.EntityProperty]::GeneratePropertyForInt(1))
             InsertOrMergeEntity -table $table -entity $entity
         } else {
+            # Increment the alert count and update the entity.
             $entity.AlertCount++
             Update-AzTableRow -Table $table -entity $entity
         }
 
+        # Check if the alert threshold is met or exceeded.
         $threshold = 2
         if ($entity.AlertCount -ge $threshold) {
             Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
             Write-Host "Creating Ticket"
             $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+            # Clean up the record from the table after handling the alert.
             remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
         }
     } else {
-        Write-Host "Alert missing in Datto RMM no further action...."
+        Write-Host "Alert missing in Datto RMM, no further action..."
     }
 }
+
 
 function Handle-BackupExecAlert {
     param ($HaloTicketCreate)
