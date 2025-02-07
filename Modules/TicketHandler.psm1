@@ -157,6 +157,8 @@ function Handle-HyperVReplicationAlert {
 
     Write-Host "Alert detected for Hyper-V Replication. Taking action..."
 
+    $alertUID = ($HaloTicketCreate.customfields | Where-Object { $_.id -eq $DattoAlertUIDField }).value
+
     $TimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("UTC")
     $CurrentTimeUTC = [System.DateTime]::UtcNow
     $UKTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("GMT Standard Time")
@@ -165,6 +167,7 @@ function Handle-HyperVReplicationAlert {
     # Check if today is Saturday or Sunday
     if ($CurrentTimeUK.DayOfWeek -eq [System.DayOfWeek]::Saturday -or $CurrentTimeUK.DayOfWeek -eq [System.DayOfWeek]::Sunday) {
         Write-Output "Today is $($CurrentTimeUK.DayOfWeek). No ticket will be created on weekends!"
+        Set-DrmmAlertResolve -alertUid $alertUID
         return
     }
 
@@ -178,6 +181,7 @@ function Handle-HyperVReplicationAlert {
         $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
     } else {
         Write-Output "The current time is outside of 9 AM and 5:30 PM UK time. No ticket will be created!"
+        Set-DrmmAlertResolve -alertUid $alertUID
     }
 }
 
