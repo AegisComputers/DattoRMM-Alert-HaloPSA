@@ -156,8 +156,9 @@ if ($Email) {
 
     Write-Host "Contracts for client ID - $($Contracts)"
 
-    $FilteredContracts = $Contracts | Where-Object {
-        $_.ref -like '*M' -and $_.site_id -eq $HaloSiteIDDatto
+    $FilteredContracts = $Contracts | Where-Object { #Internal work ref to stop false contracts selection from Halo when finishing internal alerts 
+        ($_.ref -like '*M' -and $_.site_id -eq $HaloSiteIDDatto) -or
+		($_.ref -like 'InternalWork' -and $_.site_id -eq $HaloSiteIDDatto)
     }
 
     # Sort the filtered contracts by 'start_date' in descending order
@@ -172,7 +173,7 @@ if ($Email) {
         summary          = $TicketSubject
         tickettype_id    = 8
         details_html     = $HtmlBody
-        DattoAlertState = 0
+        DattoAlertState  = 0
         site_id          = $HaloSiteIDDatto
         assets           = @(@{id = $HaloDevice.did })
         priority_id      = $HaloPriority
@@ -269,35 +270,21 @@ if ($Email) {
         # Handle Specific Ticket responses based on ticket subject type
         # Check if the alert message contains the specific disk usage alert for the C: drive
         if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
-
             Handle-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
-
         } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
-
             Handle-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
-
         } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
-
             #Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
             Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
-
         } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
-
             Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
-
         } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
-
             Handle-HostsAlert -HaloTicketCreate $HaloTicketCreate
-
         } else {
-
             Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
-
         }
     }
-
     #$HaloTicketCreate | Out-String | Write-Host #Enable for Debugging
-
 } else {
         Write-Host "No alert found. This webhook shouldn't be triggered this way except when testing!!!!"
 }
