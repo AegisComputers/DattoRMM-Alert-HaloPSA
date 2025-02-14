@@ -42,6 +42,10 @@ function Get-WindowsErrorMessage {
         return "The operation was aborted."
     }
 
+    if ($ErrorCode -like "*AccessDenied*") {
+		return "Access is denied."
+	}
+
     if ($ErrorCode -isnot [int]) {
 		return "ErrorCode must be an integer. Something went wrong when applying patch!"
 	}
