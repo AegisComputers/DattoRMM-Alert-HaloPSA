@@ -35,7 +35,7 @@ $global:OnlineErrorCache = @{}
 function Get-WindowsErrorMessage {
     param(
         [Parameter(Mandatory = $true)]
-        [int]$ErrorCode
+        $ErrorCode
     )
 
     # Check for a custom error message first
