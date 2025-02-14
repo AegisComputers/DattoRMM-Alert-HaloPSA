@@ -38,6 +38,14 @@ function Get-WindowsErrorMessage {
         $ErrorCode
     )
 
+    if ($ErrorCode -like "*Aborted*") {
+        return "The operation was aborted."
+    }
+
+    if ($ErrorCode -isnot [int]) {
+		return "ErrorCode must be an integer. Something went wrong when applying patch!"
+	}
+
     # Check for a custom error message first
     $customErrorMessage = Get-CustomErrorMessage -ErrorCode $ErrorCode
     if ($customErrorMessage) {
