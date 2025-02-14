@@ -138,7 +138,7 @@ if ($Email) {
     # Find the Halo site ID associated with the Datto site name provided in the site details
     $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
 
-    Write-Host ("Found Halo site with ID - $($RSiteDetails)")
+    Write-Host ("Found Halo site with ID - $($HaloSiteIDDatto)")
 
     # Store the Datto site details from the request body into a variable
     $dattoLookupString = $Request.Body.dattoSiteDetails
