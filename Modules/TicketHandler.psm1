@@ -46,14 +46,19 @@ function Get-WindowsErrorMessage {
 		return "Access is denied."
 	}
 
-    if ($ErrorCode -isnot [int]) {
-		return "ErrorCode must be an integer. Something went wrong when applying patch!"
-	}
+    #if ($ErrorCode -isnot [int]) {
+	#	return "ErrorCode must be an integer. Something went wrong when applying patch!"
+	#}
 
     # Check for a custom error message first
-    $customErrorMessage = Get-CustomErrorMessage -ErrorCode $ErrorCode
-    if ($customErrorMessage) {
-        return $customErrorMessage
+    try {
+        $customErrorMessage = Get-CustomErrorMessage -ErrorCode $ErrorCode
+        if ($customErrorMessage) {
+            return $customErrorMessage
+        }
+    } catch {
+        Write-Debug "Failed to find custom error code entry for code $ErrorCode. Error: $_"
+        $errorMessage = "Unknown error code or not a Win32 error."
     }
 
     # Try using Win32Exception to get a message
@@ -62,17 +67,21 @@ function Get-WindowsErrorMessage {
         $errorMessage = $exception.Message
     } catch {
         Write-Debug "Failed to create Win32Exception for code $ErrorCode. Error: $_"
-        $errorMessage = "Unknown error code or not a Win32 error."
+        $errorMessage = "Unknown error code."
     }
 
     # If the error message is the default message, attempt an online lookup.
-    if ($errorMessage -eq "Unknown error code or not a Win32 error.") {
-        $onlineErrorMessage = Get-OnlineErrorMessage -ErrorCode $ErrorCode
-        if ($onlineErrorMessage) {
-            $errorMessage = $onlineErrorMessage
+    try {
+        if ($errorMessage -eq "Unknown error code or not a Win32 error.") {
+            $onlineErrorMessage = Get-OnlineErrorMessage -ErrorCode $ErrorCode
+            if ($onlineErrorMessage) {
+                $errorMessage = $onlineErrorMessage
+            }
         }
+    } catch { 
+        Write-Debug "Failed to find online entry for code $ErrorCode. Error: $_"
+        $errorMessage = "Unknown error code."
     }
-    
     return $errorMessage
 }
 
