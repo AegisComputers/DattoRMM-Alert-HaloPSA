@@ -274,8 +274,8 @@ if ($Email) {
         } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
             Handle-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
         } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
-            #Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
-            Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+            Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
+            #Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
         } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
             Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
         } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
