@@ -32,7 +32,6 @@ function Get-HaloUserEmail {
 
     try {
         # Try to execute the following block of code
-
         # Retrieve the email address by calling the Get-HaloUser cmdlet with the provided Username and ClientId
         # Access the 'emailaddress' property of the returned object and assign it to the variable $address
         $address = (Get-HaloUser -Search $Username -ClientID $ClientId).emailaddress
@@ -48,7 +47,6 @@ function Get-HaloUserEmail {
         }
     } catch {
         # If any exception occurs, catch it and handle it here
-
         # Write an error message with the exception details
         Write-Error "Failed to retrieve email address: $_"
         return $false
@@ -121,7 +119,6 @@ function Send-HaloEmailResponse {
 
     } catch {
         # If any exception occurs, catch it and handle it here
-
         # Write an error message with the exception details
         Write-Error "Failed to send email: $_"
         return $false
@@ -197,7 +194,6 @@ function FindAndSendHaloResponse {
         return $true
     } catch {
         # If any exception occurs, catch it and handle it here
-
         # Write an error message with the exception details
         Write-Error "An error occurred: $_"
         return $false
