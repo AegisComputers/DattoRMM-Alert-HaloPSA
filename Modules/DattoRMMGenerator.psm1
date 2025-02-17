@@ -6,7 +6,6 @@ function Get-DRMMAlertColour {
     param (
         $Priority
     )
-
     Switch ($Alert.Priority) {
         'Critical' { $Colour = ' background-color:#EC422E; color:#1C3E4C' }
         'High' { $Colour = ' background-color:#F68218; color:#1C3E4C' }
@@ -14,9 +13,7 @@ function Get-DRMMAlertColour {
         'Low' { $Colour = ' background-color:#2C81C8; color:#ffffff' }
         default { $Colour = 'color:#ffffff;' }
     }
-
     Return $Colour
-
 }
 
 function Get-DRMMAlertDetailsSection {
