@@ -4,7 +4,6 @@ function Get-MapColour {
         $MapList,
         $Count
     )
-
     $Maximum = ($MapList | measure-object).count - 1
     $Index = [array]::indexof($MapList, "$count")
     $Sixth = $Maximum / 6
@@ -25,8 +24,7 @@ function Get-MapColour {
         return "rgb(172, 89, 77)"
     } else {
         return "rgb(130, 34, 59)"
-    }
-    
+    }    
 }
 
 function Get-HeatMap {
@@ -358,28 +356,22 @@ function Get-HTMLBody {
             Write-Host "New Footer"
             $currentColumn = 0
         }
-
         $currentColumn++
         $SectionCount++
         $ReturnHtml -join ''
     }
-
     $HTML = $HTMLHeader + ($BlockHTML) + $HTMLFooter
 
     return $HTML
-
 }
 
 Function Get-AlertEmailBody($AlertWebhook) {
     $DattoURL = $env:DattoURL
     $DattoKey = $env:DattoKey
     $DattoSecretKey = $env:DattoSecretKey
-
     $CPUUDF = $env:CPUUDF
     $RAMUDF = $env:RAMUDF
-
     $NumberOfColumns = $env:NumberOfColumns
-
     $AlertTroubleshooting = $AlertWebhook.troubleshootingNote
     $AlertDocumentationURL = $AlertWebhook.docURL
     $ShowDeviceDetails = $AlertWebhook.showDeviceDetails
@@ -426,16 +418,13 @@ Function Get-AlertEmailBody($AlertWebhook) {
         if ($ShowDeviceDetails -eq $True) {
             Get-DRMMDeviceDetailsSection -Sections $Sections -Device $Device
         }
-
         # Build the device status section if enabled
         if ($ShowDeviceStatus -eq $true) {
             Get-DRMMDeviceStatusSection -Sections $Sections -Device $Device -DeviceAudit $DeviceAudit -CPUUDF $CPUUDF -RAMUDF $RAMUDF
         }
-
         if ($showAlertDetails -eq $true) {
             Get-DRMMAlertHistorySection -Sections $Sections -Alert $Alert -DattoPlatform $DattoPlatform
         }
-
         $TicketSubject = "Device: $($Device.hostname) raised Alert: $($AlertTypesLookup[$Alert.alertContext.'@class']) - $($AlertMessage)"
 
         $HTMLBody = Get-HTMLBody -Sections $Sections -NumberOfColumns $NumberOfColumns
@@ -447,7 +436,6 @@ Function Get-AlertEmailBody($AlertWebhook) {
         }
 
         Return $Email
-
     } else {
         Return $Null
     }
@@ -468,14 +456,11 @@ function Get-StorageTable {
     param (
         [string]$tableName
     )
-
     $storageContext = Get-StorageContext
     $table = Get-AzStorageTable -Context $storageContext -Name $tableName -ErrorAction SilentlyContinue
-
     if (-not $table) {
         $table = New-AzStorageTable -Context $storageContext -Name $tableName
     }
-
     return $table.CloudTable
 }
 
@@ -485,7 +470,6 @@ function InsertOrMergeEntity {
         [Microsoft.Azure.Cosmos.Table.CloudTable]$table,
         [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]$entity
     )
-
     $operation = [Microsoft.Azure.Cosmos.Table.TableOperation]::InsertOrMerge($entity)
     $result = $table.Execute($operation)
     return $result.Result
@@ -497,14 +481,11 @@ function GetEntity {
         $partitionKey,
         $rowKey
     )
-
     try {
         $entity = Get-AzTableRow -RowKey $rowKey -Table $table -PartitionKey $partitionKey
-        if ($entity -ne $null) {
-            
+        if ($entity -ne $null) {            
             return $entity
-        } else {
-            
+        } else {           
             return $null
         }
     } catch {
