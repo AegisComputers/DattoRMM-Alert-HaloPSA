@@ -179,17 +179,13 @@ function Get-DRMMDeviceStatusSection {
         $CPUUDF,
         $RAMUDF
     )
-
     # Generate CPU/ RAM Use Data
     $CPUData = $Device.udf."udf$CPUUDF" | convertfrom-json
     $RAMData = $Device.udf."udf$RAMUDF" | convertfrom-json
-
     $CPUUse = $CPUData.T
     $RAMUse = $RAMData.T
-
     $CPUTable = Get-DecodedTable -TableString $CPUData.D -UseValue '%' | convertto-html -Fragment
     $RAMTable = Get-DecodedTable -TableString $RAMData.D -UseValue 'GBs' | convertto-html -Fragment
-
     $DiskData = $DeviceAudit.logicalDisks | where-object { $_.freespace }
 
     # Build the HTML for Disk Usage
