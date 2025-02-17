@@ -22,7 +22,7 @@ if (-not $table) {
 }
 
 # Define the threshold for row deletion, converted to UTC
-$thresholdDate = (Get-Date).AddDays(-30).ToUniversalTime()
+$thresholdDate = (Get-Date).AddDays(-31).ToUniversalTime()
 # Retrieve all entities from the table
 $entities = Get-AzTableRowAll -Table $table
 
