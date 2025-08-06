@@ -431,23 +431,31 @@ function Find-ExistingSecurityAlert {
         Write-Host "Search returned $($searchResults.Count) open tickets for device: $DeviceName"
         
         if ($searchResults -and $searchResults.Count -gt 0) {
-            # Filter results by date and alert type - no need to check status since -OpenOnly guarantees open tickets
+            # Filter results by alert type - no need to check status since -OpenOnly guarantees open tickets
+            # No need to check date since open tickets are still relevant for consolidation
+            $matchingTickets = @()
+            
             foreach ($ticket in $searchResults) {
                 # Check if ticket summary contains our alert type
                 if ($ticket.summary -like "*$AlertType*") {
-                    # Check if ticket is within our time window
-                    $ticketDate = [DateTime]::Parse($ticket.dateoccured)
-                    $cutoffDate = (Get-Date).AddHours(-$windowHours)
-                    
-                    if ($ticketDate -gt $cutoffDate) {
-                        Write-Host "Found existing open ticket for consolidation: ID $($ticket.id) - $($ticket.summary)"
-                        return $ticket
-                    } else {
-                        Write-Host "Ticket $($ticket.id) is outside time window (created $ticketDate, cutoff $cutoffDate)"
-                    }
+                    Write-Host "Found potential consolidation ticket: ID $($ticket.id) - $($ticket.summary)"
+                    $matchingTickets += $ticket
                 } else {
                     Write-Host "Ticket $($ticket.id) does not contain alert type '$AlertType' in summary: $($ticket.summary)"
                 }
+            }
+            
+            # If we found multiple matching tickets, select the best one
+            if ($matchingTickets.Count -gt 1) {
+                Write-Host "Found $($matchingTickets.Count) matching tickets. Selecting the most recent one."
+                
+                # Sort by ticket ID (assuming higher ID = more recent) and take the most recent
+                $selectedTicket = $matchingTickets | Sort-Object { [int]$_.id } -Descending | Select-Object -First 1
+                Write-Host "Selected ticket ID $($selectedTicket.id) as the most recent for consolidation"
+                return $selectedTicket
+            } elseif ($matchingTickets.Count -eq 1) {
+                Write-Host "Found single matching ticket for consolidation: ID $($matchingTickets[0].id)"
+                return $matchingTickets[0]
             }
         }
         
