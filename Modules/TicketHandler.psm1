@@ -418,27 +418,40 @@ function Find-ExistingSecurityAlert {
         $searchStatuses = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationSearchStatuses" -DefaultValue @("Open", "In Progress")
         
         # Build search query - looking for tickets with similar subject pattern
+        # The actual format is: "Device: hostname raised Alert: AlertType - AlertMessage"
+        # We need to search more broadly to catch different alert type prefixes
         $searchPattern = "Device: $DeviceName raised Alert:*$AlertType*"
         
         Write-Host "Searching for existing tickets matching pattern: $searchPattern"
         
-        # Search for tickets using Halo API
-        $searchResults = Get-HaloTicket -Search $searchPattern -OpenOnly -FullObjects
+        # Search for tickets using Halo API - try broader search first
+        $searchResults = Get-HaloTicket -Search "Device: $DeviceName" -OpenOnly -FullObjects
+        
+        Write-Host "Search returned $($searchResults.Count) results for device: $DeviceName"
         
         if ($searchResults -and $searchResults.Count -gt 0) {
-            # Filter results by status and date
+            # Filter results by status, date, and alert type
             foreach ($ticket in $searchResults) {
-                # Check if ticket status matches our search criteria
-                $ticketStatus = $ticket.status_name
-                if ($ticketStatus -in $searchStatuses) {
-                    # Check if ticket is within our time window
-                    $ticketDate = [DateTime]::Parse($ticket.dateoccured)
-                    $cutoffDate = (Get-Date).AddHours(-$windowHours)
-                    
-                    if ($ticketDate -gt $cutoffDate) {
-                        Write-Host "Found existing ticket for consolidation: ID $($ticket.id) - $($ticket.summary)"
-                        return $ticket
+                # Check if ticket summary contains our alert type
+                if ($ticket.summary -like "*$AlertType*") {
+                    # Check if ticket status matches our search criteria
+                    $ticketStatus = $ticket.status_name
+                    if ($ticketStatus -in $searchStatuses) {
+                        # Check if ticket is within our time window
+                        $ticketDate = [DateTime]::Parse($ticket.dateoccured)
+                        $cutoffDate = (Get-Date).AddHours(-$windowHours)
+                        
+                        if ($ticketDate -gt $cutoffDate) {
+                            Write-Host "Found existing ticket for consolidation: ID $($ticket.id) - $($ticket.summary)"
+                            return $ticket
+                        } else {
+                            Write-Host "Ticket $($ticket.id) is outside time window (created $ticketDate, cutoff $cutoffDate)"
+                        }
+                    } else {
+                        Write-Host "Ticket $($ticket.id) status '$ticketStatus' not in search statuses"
                     }
+                } else {
+                    Write-Host "Ticket $($ticket.id) does not contain alert type '$AlertType' in summary: $($ticket.summary)"
                 }
             }
         }
@@ -579,19 +592,26 @@ function Test-AlertConsolidation {
         if ($HaloTicketCreate.summary -match "Device:\s*([^\s]+)\s+raised Alert") {
             $deviceName = $matches[1]
         } else {
-            Write-Debug "Could not extract device name from ticket summary: $($HaloTicketCreate.summary)"
+            Write-Host "Could not extract device name from ticket summary: $($HaloTicketCreate.summary)"
             return $false
         }
         
         # Extract alert type from the summary
+        # Format is: "Device: hostname raised Alert: AlertCategory - AlertMessage"
+        # We want to extract the AlertMessage part for matching
         $alertType = ""
-        if ($HaloTicketCreate.summary -match "raised Alert:\s*-?\s*(.+?)\.?(\s+Subject:|$)") {
-            $alertType = $matches[1].Trim()
+        if ($HaloTicketCreate.summary -match "raised Alert:\s*([^-]+)\s*-\s*(.+?)(\s+Subject:|$)") {
+            # Extract the message part after the dash
+            $alertType = $matches[2].Trim().TrimEnd('.')
+        } elseif ($HaloTicketCreate.summary -match "raised Alert:\s*(.+?)(\s+Subject:|$)") {
+            # Fallback to extract everything after "raised Alert:"
+            $alertType = $matches[1].Trim().TrimEnd('.')
         } else {
-            Write-Debug "Could not extract alert type from ticket summary: $($HaloTicketCreate.summary)"
+            Write-Host "Could not extract alert type from ticket summary: $($HaloTicketCreate.summary)"
             return $false
         }
         
+        Write-Host "Full ticket summary: $($HaloTicketCreate.summary)"
         Write-Host "Testing consolidation for device '$deviceName' and alert type '$alertType'"
         
         # Search for existing ticket
