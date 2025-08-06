@@ -296,6 +296,52 @@ function New-DefaultConfigurationFile {
             Low = "4"
             Information = "4"
         }
+        AlertConsolidation = @{
+            EnableConsolidation = $true
+            ConsolidationWindowHours = 24
+            ConsolidatableAlertTypes = @(
+                "An account failed to log on",
+                "Account lockout", 
+                "Multiple failed login attempts",
+                "Security audit failure"
+            )
+            ConsolidationSearchStatuses = @(
+                "Awaiting Customer Reply (AS)",
+                "Awaiting Customer Reply (CS)", 
+                "New",
+                "Agent Assigned",
+                "Work In Progress",
+                "Awaiting 3rd Party Action",
+                "Project",
+                "Awaiting Approval",
+                "Awaiting Availability",
+                "Awaiting Deletion",
+                "Awaiting Client Confirmation",
+                "Awaiting Information",
+                "Awaiting Invoice Amendments",
+                "Awaiting Parts",
+                "Awaiting Quote",
+                "Awaiting Reply",
+                "Awaiting Fix or Change",
+                "Awaiting Schedule",
+                "Awaiting Delivery",
+                "Awaiting Time Adding",
+                "Dispatched (DHL)",
+                "Parked",
+                "Scheduled",
+                "Awaiting for Supplier Information",
+                "Awaiting Closure (Complete)",
+                "Workflow in Progress",
+                "Re-Opened Ticket",
+                "Leaver",
+                "Joiner",
+                "Change Request: Approval Pending",
+                "Change Request: Approved and Scheduled",
+                "On Hold - Inactive"
+            )
+            MaxConsolidationCount = 500
+            ConsolidationNoteTemplate = "Additional {AlertType} alert detected at {Timestamp}. Total occurrences: {Count}"
+        }
         Debugging = @{
             EnableVerboseLogging = $false
             LogTicketCreationDetails = $true

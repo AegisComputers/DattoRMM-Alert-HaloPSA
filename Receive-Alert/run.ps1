@@ -291,21 +291,31 @@ if ($Email) {
         }
         
     } else {
-        # Handle Specific Ticket responses based on ticket subject type
-        # Check if the alert message contains the specific disk usage alert for the C: drive
-        if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
-            Handle-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
-        } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
-            Handle-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
-        } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
-            Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
-            #Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
-        } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
-            Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
-        } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
-            Handle-HostsAlert -HaloTicketCreate $HaloTicketCreate
+        # Check for alert consolidation before creating new tickets
+        Write-Host "Checking if alert should be consolidated with existing ticket..."
+        $wasConsolidated = Test-AlertConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+        
+        if ($wasConsolidated) {
+            Write-Host "Alert was successfully consolidated with existing ticket. No new ticket created."
         } else {
-            Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+            Write-Host "No consolidation performed. Processing alert normally..."
+            
+            # Handle Specific Ticket responses based on ticket subject type
+            # Check if the alert message contains the specific disk usage alert for the C: drive
+            if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
+                Handle-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
+            } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
+                Handle-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
+            } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
+                Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
+                #Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+            } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
+                Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
+            } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
+                Handle-HostsAlert -HaloTicketCreate $HaloTicketCreate
+            } else {
+                Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+            }
         }
     }
     #$HaloTicketCreate | Out-String | Write-Host #Enable for Debugging

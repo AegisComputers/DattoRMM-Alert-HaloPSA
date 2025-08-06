@@ -369,9 +369,279 @@ function Handle-HostsAlert {
     $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
 
+function Find-ExistingSecurityAlert {
+    <#
+    .SYNOPSIS
+    Searches for existing tickets that match the device and alert type pattern.
+    
+    .PARAMETER DeviceName
+    The name of the device from the alert
+    
+    .PARAMETER AlertType
+    The type of alert to search for (e.g., "An account failed to log on")
+    
+    .RETURNS
+    Existing ticket object if found, null if not found
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [string]$AlertType
+    )
+    
+    # Check if consolidation is enabled
+    $consolidationEnabled = Get-AlertingConfig -Path "AlertConsolidation.EnableConsolidation" -DefaultValue $false
+    if (-not $consolidationEnabled) {
+        Write-Debug "Alert consolidation is disabled"
+        return $null
+    }
+    
+    # Check if this alert type should be consolidated
+    $consolidatableTypes = Get-AlertingConfig -Path "AlertConsolidation.ConsolidatableAlertTypes" -DefaultValue @()
+    $shouldConsolidate = $false
+    foreach ($type in $consolidatableTypes) {
+        if ($AlertType -like "*$type*") {
+            $shouldConsolidate = $true
+            break
+        }
+    }
+    
+    if (-not $shouldConsolidate) {
+        Write-Debug "Alert type '$AlertType' is not configured for consolidation"
+        return $null
+    }
+    
+    try {
+        # Get configuration for search
+        $windowHours = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationWindowHours" -DefaultValue 24
+        $searchStatuses = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationSearchStatuses" -DefaultValue @("Open", "In Progress")
+        
+        # Build search query - looking for tickets with similar subject pattern
+        $searchPattern = "Device: $DeviceName raised Alert:*$AlertType*"
+        
+        Write-Host "Searching for existing tickets matching pattern: $searchPattern"
+        
+        # Search for tickets using Halo API
+        $searchResults = Get-HaloTicket -Search $searchPattern -OpenOnly -FullObjects
+        
+        if ($searchResults -and $searchResults.Count -gt 0) {
+            # Filter results by status and date
+            foreach ($ticket in $searchResults) {
+                # Check if ticket status matches our search criteria
+                $ticketStatus = $ticket.status_name
+                if ($ticketStatus -in $searchStatuses) {
+                    # Check if ticket is within our time window
+                    $ticketDate = [DateTime]::Parse($ticket.dateoccured)
+                    $cutoffDate = (Get-Date).AddHours(-$windowHours)
+                    
+                    if ($ticketDate -gt $cutoffDate) {
+                        Write-Host "Found existing ticket for consolidation: ID $($ticket.id) - $($ticket.summary)"
+                        return $ticket
+                    }
+                }
+            }
+        }
+        
+        Write-Host "No existing tickets found for consolidation"
+        return $null
+    }
+    catch {
+        Write-Warning "Error searching for existing tickets: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+function Update-ExistingSecurityTicket {
+    <#
+    .SYNOPSIS
+    Updates an existing ticket with information about a new occurrence of the same alert.
+    
+    .PARAMETER ExistingTicket
+    The existing ticket to update
+    
+    .PARAMETER AlertType
+    The type of alert that occurred
+    
+    .PARAMETER NewAlertDetails
+    Details of the new alert occurrence
+    
+    .RETURNS
+    True if update successful, false otherwise
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [PSObject]$ExistingTicket,
+        [Parameter(Mandatory)]
+        [string]$AlertType,
+        [Parameter(Mandatory)]
+        [PSObject]$NewAlertDetails
+    )
+    
+    try {
+        # Get consolidation configuration
+        $maxCount = Get-AlertingConfig -Path "AlertConsolidation.MaxConsolidationCount" -DefaultValue 50
+        $noteTemplate = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationNoteTemplate" -DefaultValue "Additional {AlertType} alert detected at {Timestamp}. Total occurrences: {Count}"
+        
+        # Check if we've reached max consolidation limit
+        $currentNotes = Get-HaloTicket -TicketID $ExistingTicket.id -IncludeDetails -FullObjects
+        $consolidationNotes = $currentNotes.actions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" }
+        $currentCount = $consolidationNotes.Count + 1 # +1 for the original ticket
+        
+        if ($currentCount -ge $maxCount) {
+            Write-Warning "Maximum consolidation count ($maxCount) reached for ticket $($ExistingTicket.id). Creating new ticket instead."
+            return $false
+        }
+        
+        # Create consolidation note
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $consolidationNote = $noteTemplate -replace "\{AlertType\}", $AlertType -replace "\{Timestamp\}", $timestamp -replace "\{Count\}", ($currentCount + 1)
+        
+        # Add details from the new alert
+        $consolidationNote += "`n`nNew Alert Details:`n"
+        if ($NewAlertDetails.alertMessage) {
+            $consolidationNote += "Alert Message: $($NewAlertDetails.alertMessage)`n"
+        }
+        if ($NewAlertDetails.alertUID) {
+            $consolidationNote += "Alert UID: $($NewAlertDetails.alertUID)`n"
+        }
+        
+        # Create the action object for adding a note
+        $actionToAdd = @{
+            ticket_id = $ExistingTicket.id
+            actionid          = 23
+            outcome           = "Remote"
+            outcome_id        = 23
+            note = $consolidationNote
+            actionarrivaldate = Get-Date
+            actioncompletiondate = Get-Date
+            action_isresponse = $false
+            validate_response = $false
+            sendemail = $false
+        }
+        
+        # Add the note to the ticket
+        $actionResult = New-HaloAction -Action $actionToAdd
+        
+        if ($actionResult) {
+            Write-Host "Successfully added consolidation note to ticket $($ExistingTicket.id)"
+            
+            # Update ticket to ensure it's marked as responded to
+            $ticketUpdate = @{
+                id = $ExistingTicket.id
+                status_id = $ExistingTicket.status_id
+                agent_id = 38
+            }
+            
+            try {
+                Set-HaloTicket -Ticket $ticketUpdate
+                Write-Host "Updated ticket response timestamp"
+            }
+            catch {
+                Write-Warning "Failed to update ticket response timestamp: $($_.Exception.Message)"
+            }
+            
+            return $true
+        } else {
+            Write-Error "Failed to add note to ticket $($ExistingTicket.id)"
+            return $false
+        }
+    }
+    catch {
+        Write-Error "Error updating existing ticket: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Test-AlertConsolidation {
+    <#
+    .SYNOPSIS
+    Tests if an alert should be consolidated with an existing ticket.
+    
+    .PARAMETER HaloTicketCreate
+    The ticket object that would be created
+    
+    .PARAMETER AlertWebhook
+    The webhook data from the alert
+    
+    .RETURNS
+    True if alert was consolidated, false if new ticket should be created
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [PSObject]$HaloTicketCreate,
+        [Parameter(Mandatory)]
+        [PSObject]$AlertWebhook
+    )
+    
+    try {
+        # Extract device name from ticket summary
+        if ($HaloTicketCreate.summary -match "Device:\s*([^\s]+)\s+raised Alert") {
+            $deviceName = $matches[1]
+        } else {
+            Write-Debug "Could not extract device name from ticket summary: $($HaloTicketCreate.summary)"
+            return $false
+        }
+        
+        # Extract alert type from the summary
+        $alertType = ""
+        if ($HaloTicketCreate.summary -match "raised Alert:\s*-?\s*(.+?)\.?(\s+Subject:|$)") {
+            $alertType = $matches[1].Trim()
+        } else {
+            Write-Debug "Could not extract alert type from ticket summary: $($HaloTicketCreate.summary)"
+            return $false
+        }
+        
+        Write-Host "Testing consolidation for device '$deviceName' and alert type '$alertType'"
+        
+        # Search for existing ticket
+        $existingTicket = Find-ExistingSecurityAlert -DeviceName $deviceName -AlertType $alertType
+        
+        if ($existingTicket) {
+            Write-Host "Found existing ticket for consolidation: $($existingTicket.id)"
+            
+            # Update the existing ticket
+            $updateResult = Update-ExistingSecurityTicket -ExistingTicket $existingTicket -AlertType $alertType -NewAlertDetails $AlertWebhook
+            
+            if ($updateResult) {
+                Write-Host "Successfully consolidated alert into existing ticket $($existingTicket.id)"
+                return $true
+            } else {
+                Write-Warning "Failed to consolidate alert. Will create new ticket."
+                return $false
+            }
+        } else {
+            Write-Host "No existing ticket found for consolidation. Will create new ticket."
+            return $false
+        }
+    }
+    catch {
+        Write-Error "Error in alert consolidation test: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Handle-DefaultAlert {
     param ($HaloTicketCreate)
 
     Write-Host "Creating Ticket without additional processing!"
     $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
+
+# Export the public functions
+Export-ModuleMember -Function @(
+    'New-HaloTicketWithFallback',
+    'New-MinimalTicketContent',
+    'Get-WindowsErrorMessage',
+    'Get-CustomErrorMessage',
+    'Get-OnlineErrorMessage',
+    'Handle-DiskUsageAlert',
+    'Handle-HyperVReplicationAlert',
+    'Handle-PatchMonitorAlert',
+    'Handle-BackupExecAlert',
+    'Handle-HostsAlert',
+    'Handle-DefaultAlert',
+    'Find-ExistingSecurityAlert',
+    'Update-ExistingSecurityTicket',
+    'Test-AlertConsolidation'
+)
