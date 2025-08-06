@@ -38,9 +38,12 @@ function Find-DattoAlertHaloSite {
         
         # Add error handling for client lookup
         $HaloClients = Get-HaloClient -Search $DattoCustomer
+        $defaultSiteId = Get-AlertingConfig -Path "TicketDefaults.DefaultSiteId" -DefaultValue 286
+        $defaultClientName = Get-AlertingConfig -Path "TicketDefaults.DefaultClientName" -DefaultValue "Aegis Internal"
+        
         if (-not $HaloClients -or $HaloClients.Count -eq 0) {
-            Write-Warning "No Halo client found for '$DattoCustomer'. Using Aegis Internal (286)."
-            return 286
+            Write-Warning "No Halo client found for '$DattoCustomer'. Using $defaultClientName ($defaultSiteId)."
+            return $defaultSiteId
         }
         $HaloClientID = $HaloClients[0].id
         
@@ -58,15 +61,17 @@ function Find-DattoAlertHaloSite {
                 $HaloSiteID = $SiteInfo[0].id
             }
         } else {
-            Write-Host "No Valid Site or Customer Found Setting to Aegis Internal"
-            $HaloSiteID = 286
+            Write-Host "No Valid Site or Customer Found Setting to $defaultClientName"
+            $HaloSiteID = $defaultSiteId
         }
         Write-Host "Selected Site Id of $($HaloSiteID)"
 
         return $HaloSiteID
     } catch {
-        Write-Warning "Error in site lookup for '$DattoSiteName': $($_.Exception.Message). Using Aegis Internal (286)."
-        return 286
+        $defaultSiteId = Get-AlertingConfig -Path "TicketDefaults.DefaultSiteId" -DefaultValue 286
+        $defaultClientName = Get-AlertingConfig -Path "TicketDefaults.DefaultClientName" -DefaultValue "Aegis Internal"
+        Write-Warning "Error in site lookup for '$DattoSiteName': $($_.Exception.Message). Using $defaultClientName ($defaultSiteId)."
+        return $defaultSiteId
     }
 }
 

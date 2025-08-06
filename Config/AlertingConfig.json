@@ -1,0 +1,82 @@
+{
+    "AlertThresholds": {
+        "PatchAlertCount": 2,
+        "HtmlBodyMaxLength": 3000000,
+        "RelatedAlertWindowMinutes": 5,
+        "HaloAlertHistoryDays": 30,
+        "ReoccurringTicketHours": 24
+    },
+    "BusinessHours": {
+        "StartTime": "09:00",
+        "EndTime": "17:30",
+        "TimeZone": "GMT Standard Time",
+        "WorkDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "SkipWeekendsForHyperV": true
+    },
+    "Storage": {
+        "TableName": "DevicePatchAlerts",
+        "PartitionKey": "DeviceAlert",
+        "StorageAccountName": "dattohaloalertsstgnirab"
+    },
+    "TicketDefaults": {
+        "TicketTypeId": 8,
+        "Category1": "Datto Alert",
+        "SetTicketResponded": true,
+        "DefaultSiteId": 286,
+        "DefaultClientName": "Aegis Internal"
+    },
+    "PriorityMapping": {
+        "Critical": "4",
+        "High": "4", 
+        "Moderate": "4",
+        "Low": "4",
+        "Information": "4"
+    },
+    "AlertTypeMapping": {
+        "perf_resource_usage_ctx": "Resource Monitor",
+        "comp_script_ctx": "Component Monitor",
+        "perf_mon_ctx": "Performance Monitor",
+        "online_offline_status_ctx": "Offline",
+        "eventlog_ctx": "Event Log",
+        "perf_disk_usage_ctx": "Disk Usage",
+        "patch_ctx": "Patch Monitor",
+        "srvc_status_ctx": "Service Status",
+        "antivirus_ctx": "Antivirus",
+        "custom_snmp_ctx": "SNMP",
+        "endpoint_security_threat_ctx": "Endpoint Security"
+    },
+    "HtmlOptimization": {
+        "CompressionEnabled": true,
+        "TruncationEnabled": true,
+        "MinimalFallbackEnabled": true,
+        "RetainPriorityColors": true
+    },
+    "ErrorHandling": {
+        "MaxRetryAttempts": 3,
+        "RetryDelaySeconds": 2,
+        "EnableFallbackTickets": true,
+        "LogDetailedErrors": true
+    },
+    "CustomerNotifications": {
+        "DiskUsage": {
+            "SendEmailToUser": true,
+            "EmailTemplate": "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>",
+            "SupportPhone": "01865 393760"
+        }
+    },
+    "WindowsErrorCodes": {
+        "0x80240022": "WU_E_ALL_UPDATES_FAILED: Operation failed for all updates.",
+        "0x80070005": "E_ACCESSDENIED: Access Denied, insufficient permissions.",
+        "0x80004005": "E_FAIL: Unspecified error, often related to file or registry issues.",
+        "0x80070002": "ERROR_FILE_NOT_FOUND: The system cannot find the file specified.",
+        "0x80070003": "ERROR_PATH_NOT_FOUND: The system cannot find the path specified.",
+        "0x80070057": "E_INVALIDARG: One or more arguments are invalid.",
+        "0x8000FFFF": "E_UNEXPECTED: Unexpected failure.",
+        "0x80070006": "E_HANDLE: Invalid handle error, generally related to system resource issues."
+    },
+    "Debugging": {
+        "EnableVerboseLogging": false,
+        "LogTicketCreationDetails": true,
+        "EnablePerformanceMetrics": false
+    }
+}

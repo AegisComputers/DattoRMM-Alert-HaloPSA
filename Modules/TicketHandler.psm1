@@ -1,8 +1,8 @@
 # TicketHandler.ps1
 # Set environment variables and local variables
-$storageAccountName = "dattohaloalertsstgnirab"
+$storageAccountName = Get-AlertingConfig -Path "Storage.StorageAccountName" -DefaultValue "dattohaloalertsstgnirab"
 $storageAccountKey = $env:strKey
-$tableName = "DevicePatchAlerts"
+$tableName = Get-AlertingConfig -Path "Storage.TableName" -DefaultValue "DevicePatchAlerts"
 
 # Ensure the storage account key is set
 if (-not $storageAccountKey) {
@@ -156,18 +156,13 @@ function Get-CustomErrorMessage {
         [int]$ErrorCode
     )
 
-    $errorDictionary = @{
-        0x80240022 = "WU_E_ALL_UPDATES_FAILED: Operation failed for all updates."
-        0x80070005 = "E_ACCESSDENIED: Access Denied, insufficient permissions."
-        0x80004005 = "E_FAIL: Unspecified error, often related to file or registry issues."
-        0x80070002 = "ERROR_FILE_NOT_FOUND: The system cannot find the file specified."
-        0x80070003 = "ERROR_PATH_NOT_FOUND: The system cannot find the path specified."
-        0x80070057 = "E_INVALIDARG: One or more arguments are invalid."
-        0x8000FFFF = "E_UNEXPECTED: Unexpected failure."
-        0x80070006 = "E_HANDLE: Invalid handle error, generally related to system resource issues."
-    }
-
-    return $errorDictionary[$ErrorCode]
+    # Get error codes from configuration
+    $errorDictionary = Get-AlertingConfig -Path "WindowsErrorCodes" -DefaultValue @{}
+    
+    # Convert error code to hex format for lookup
+    $hexErrorCode = "0x{0:X8}" -f $ErrorCode
+    
+    return $errorDictionary.$hexErrorCode
 }
 
 function Get-OnlineErrorMessage {
@@ -230,7 +225,7 @@ function Handle-DiskUsageAlert {
         FindAndSendHaloResponse -Username $Username `
             -ClientID $HaloClientDattoMatch `
             -TicketId $Ticket.id `
-            -EmailMessage "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>" `
+            -EmailMessage (Get-AlertingConfig -Path "CustomerNotifications.DiskUsage.EmailTemplate" -DefaultValue "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>") `
             -ErrorAction Stop
     }
     catch {
@@ -245,29 +240,47 @@ function Handle-HyperVReplicationAlert {
 
     $alertUID = ($HaloTicketCreate.customfields | Where-Object { $_.id -eq $DattoAlertUIDField }).value
 
-    $TimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("UTC")
-    $CurrentTimeUTC = [System.DateTime]::UtcNow
-    $UKTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById("GMT Standard Time")
-    $CurrentTimeUK = [System.TimeZoneInfo]::ConvertTimeFromUtc($CurrentTimeUTC, $UKTimeZone)
+    # Get business hours configuration
+    $businessHours = Get-BusinessHoursConfig
+    if (-not $businessHours) {
+        Write-Warning "Business hours configuration not found. Using default behavior."
+        $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+        return
+    }
 
-    # Check if today is Saturday or Sunday
-    if ($CurrentTimeUK.DayOfWeek -eq [System.DayOfWeek]::Saturday -or $CurrentTimeUK.DayOfWeek -eq [System.DayOfWeek]::Sunday) {
-        Write-Output "Today is $($CurrentTimeUK.DayOfWeek). No ticket will be created on weekends!"
+    $CurrentTimeUTC = [System.DateTime]::UtcNow
+    try {
+        $timeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById($businessHours.TimeZone)
+        $CurrentTimeLocal = [System.TimeZoneInfo]::ConvertTimeFromUtc($CurrentTimeUTC, $timeZone)
+    } catch {
+        Write-Warning "Invalid timezone '$($businessHours.TimeZone)'. Using UTC."
+        $CurrentTimeLocal = $CurrentTimeUTC
+    }
+
+    # Check if today is a weekend (if configured to skip weekends)
+    if ($businessHours.SkipWeekendsForHyperV -and ($CurrentTimeLocal.DayOfWeek.ToString() -notin $businessHours.WorkDays)) {
+        Write-Output "Today is $($CurrentTimeLocal.DayOfWeek). No ticket will be created on weekends!"
         Set-DrmmAlertResolve -alertUid $alertUID
         return
     }
 
-    # Define the working hours (adjusted to match the output message, here 9:00 AM)
-    $StartTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 9, 0, 0)
-    $EndTime = [datetime]::new($CurrentTimeUK.Year, $CurrentTimeUK.Month, $CurrentTimeUK.Day, 17, 30, 0)
+    # Check if within business hours
+    try {
+        $startTime = [datetime]::ParseExact($businessHours.StartTime, "HH:mm", $null)
+        $endTime = [datetime]::ParseExact($businessHours.EndTime, "HH:mm", $null)
+        $currentTime = $CurrentTimeLocal.TimeOfDay
 
-    if ($CurrentTimeUK -ge $StartTime -and $CurrentTimeUK -lt $EndTime) {
-        Write-Output "The current time is between 9 AM and 5:30 PM UK time. A ticket will be created!"
-        Write-Host "Creating Ticket"
-        $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
-    } else {
-        Write-Output "The current time is outside of 9 AM and 5:30 PM UK time. No ticket will be created!"
-        Set-DrmmAlertResolve -alertUid $alertUID
+        if ($currentTime -ge $startTime.TimeOfDay -and $currentTime -lt $endTime.TimeOfDay) {
+            Write-Output "The current time is between $($businessHours.StartTime) and $($businessHours.EndTime) $($businessHours.TimeZone) time. A ticket will be created!"
+            Write-Host "Creating Ticket"
+            $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+        } else {
+            Write-Output "The current time is outside of $($businessHours.StartTime) and $($businessHours.EndTime) $($businessHours.TimeZone) time. No ticket will be created!"
+            Set-DrmmAlertResolve -alertUid $alertUID
+        }
+    } catch {
+        Write-Warning "Error parsing business hours times. Creating ticket anyway."
+        $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
     }
 }
 
@@ -290,7 +303,7 @@ function Handle-PatchMonitorAlert {
         $DeviceHostname = $Device.hostname
 
         # Define partition and row keys for table storage.
-        $partitionKey = "DeviceAlert"
+        $partitionKey = Get-AlertingConfig -Path "Storage.PartitionKey" -DefaultValue "DeviceAlert"
         $rowKey = $DeviceHostname
 
         # Get the table reference.
@@ -300,12 +313,12 @@ function Handle-PatchMonitorAlert {
         try {
             $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
 
-            if ($entity -eq $null) {
+            if ($null -eq $entity) {
                 # Create a new entity with an initial AlertCount of 1.
                 # Use InsertOrMerge to handle race conditions where entity might be created by another process
                 $entity = [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]::new($partitionKey, $rowKey)
                 $entity.Properties.Add("AlertCount", [Microsoft.Azure.Cosmos.Table.EntityProperty]::GeneratePropertyForInt(1))
-                $result = InsertOrMergeEntity -table $table -entity $entity
+                $null = InsertOrMergeEntity -table $table -entity $entity
                 
                 # Re-fetch the entity to get current state after potential merge
                 $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
@@ -316,11 +329,11 @@ function Handle-PatchMonitorAlert {
             }
 
             # Check if the alert threshold is met or exceeded.
-            $threshold = 2
+            $threshold = Get-AlertingConfig -Path "AlertThresholds.PatchAlertCount" -DefaultValue 2
             if ($entity.AlertCount -ge $threshold) {
                 Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
                 Write-Host "Creating Ticket"
-                $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+                $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
                 
                 # Clean up the record from the table after handling the alert.
                 try {
@@ -333,7 +346,7 @@ function Handle-PatchMonitorAlert {
             Write-Warning "Storage operation failed for device $DeviceHostname`: $($_.Exception.Message). Proceeding without storage tracking."
             # If storage fails, create ticket anyway to ensure alert is handled
             Write-Host "Creating Ticket (storage bypass)"
-            $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+            $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
         }
     } else {
         Write-Host "Alert missing in Datto RMM, no further action..."
@@ -345,7 +358,7 @@ function Handle-BackupExecAlert {
 
     Write-Host "Backup Exec Alert Detected"
     Write-Host "Creating Ticket"
-    $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+    $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
 
 function Handle-HostsAlert {
@@ -353,12 +366,12 @@ function Handle-HostsAlert {
 
     Write-Host "Hosts Alert Detected"
     Write-Host "Creating Ticket"
-    $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+    $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
 
 function Handle-DefaultAlert {
     param ($HaloTicketCreate)
 
     Write-Host "Creating Ticket without additional processing!"
-    $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+    $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }

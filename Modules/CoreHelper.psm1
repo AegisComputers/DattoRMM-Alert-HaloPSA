@@ -381,7 +381,7 @@ Function Get-AlertEmailBody($AlertWebhook) {
     $AlertMessage = $AlertWebhook.alertMessage
     $DattoPlatform = $AlertWebhook.platform
 
-    $AlertTypesLookup = @{
+    $AlertTypesLookup = Get-AlertingConfig -Path "AlertTypeMapping" -DefaultValue @{
         perf_resource_usage_ctx      = 'Resource Monitor'
         comp_script_ctx              = 'Component Monitor'
         perf_mon_ctx                 = 'Performance Monitor'

@@ -32,6 +32,24 @@ foreach($file in Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter *.psm1){
     }
 }
 
+# Initialize the configuration system
+try {
+    Write-Host "Initializing configuration system..."
+    $configInitialized = Initialize-AlertingConfiguration
+    if ($configInitialized) {
+        Write-Host "Configuration system initialized successfully."
+        # Validate configuration
+        $validationIssues = Test-AlertingConfiguration
+        if ($validationIssues.Count -eq 0) {
+            Write-Host "Configuration validation passed." -ForegroundColor Green
+        }
+    } else {
+        Write-Warning "Configuration system initialization failed. Using default values."
+    }
+} catch {
+    Write-Warning "Error initializing configuration: $_"
+}
+
 #Installed Modules
 Import-module DattoRMM
 Import-Module HaloAPI

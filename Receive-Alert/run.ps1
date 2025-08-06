@@ -22,9 +22,7 @@ $HaloTicketType = $env:HaloTicketType
 $HaloReocurringStatus = $env:HaloReocurringStatus
 
 #AZStorageVars
-$storageAccountName = "dattohaloalertsstgnirab"
-$storageAccountKey = $env:strKey
-$tableName = "DevicePatchAlerts"
+$tableName = Get-AlertingConfig -Path "Storage.TableName" -DefaultValue "DevicePatchAlerts"
 
 #Datto Vars
 $DattoURL = $env:DattoURL
@@ -40,19 +38,14 @@ $paramsDatto = @{
 
 Set-DrmmApiParameters @paramsDatto
 
-# Set if the ticket will be marked as responded in Halo
-$SetTicketResponded = $True
+# Get configuration values for potential future use
+# $SetTicketResponded = Get-AlertingConfig -Path "TicketDefaults.SetTicketResponded" -DefaultValue $true
+# $RelatedAlertMinutes = Get-AlertingConfig -Path "AlertThresholds.RelatedAlertWindowMinutes" -DefaultValue 5
+# $ReoccurringTicketHours = Get-AlertingConfig -Path "AlertThresholds.ReoccurringTicketHours" -DefaultValue 24
+# $HaloAlertHistoryDays = Get-AlertingConfig -Path "AlertThresholds.HaloAlertHistoryDays" -DefaultValue 30
 
-# Relates the tickets in Halo if the alerts arrive within x minutes for a device.
-$RelatedAlertMinutes = 5
-
-# Creates a child ticket in Halo off the main ticket if it reocurrs with the specified number of hours.
-$ReoccurringTicketHours = 24
-
-$HaloAlertHistoryDays = 30
-
-#Priority Mapping
-$PriorityHaloMap = @{
+#Priority Mapping from configuration
+$PriorityHaloMap = Get-AlertingConfig -Path "PriorityMapping" -DefaultValue @{
     "Critical"    = "4"
     "High"        = "4"
     "Moderate"    = "4"
@@ -110,35 +103,36 @@ if ($Email) {
         Write-Host "Created new Alerts Report with ID: $($HaloAlertsReportBase.id)"
     }
 
-    $HaloAlertsReport = Invoke-HaloReport -Report $HaloAlertsReportBase
+    # $HaloAlertsReport = Invoke-HaloReport -Report $HaloAlertsReportBase
 
-    $AlertReportFilter = @{
-        id                       = $HaloAlertsReport.id
-        filters                  = @(
-            @{
-                fieldname      = 'inventorynumber'
-                stringruletype = 2
-                stringruletext = "$($HaloDevice.did)"
-            }
-        )
-        _loadreportonly          = $true
-        reportingperiodstartdate = get-date(((Get-date).ToUniversalTime()).adddays(-$HaloAlertHistoryDays)) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
-        reportingperiodenddate   = get-date((Get-date -Hour 23 -Minute 59 -second 59).ToUniversalTime()) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
-        reportingperioddatefield = "dateoccured"
-        reportingperiod          = "7"
-    }
+    # Alert report filtering for potential future correlation logic
+    # $AlertReportFilter = @{
+    #     id                       = $HaloAlertsReport.id
+    #     filters                  = @(
+    #         @{
+    #             fieldname      = 'inventorynumber'
+    #             stringruletype = 2
+    #             stringruletext = "$($HaloDevice.did)"
+    #         }
+    #     )
+    #     _loadreportonly          = $true
+    #     reportingperiodstartdate = get-date(((Get-date).ToUniversalTime()).adddays(-$HaloAlertHistoryDays)) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
+    #     reportingperiodenddate   = get-date((Get-date -Hour 23 -Minute 59 -second 59).ToUniversalTime()) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
+    #     reportingperioddatefield = "dateoccured"
+    #     reportingperiod          = "7"
+    # }
 
     # Retrieve the report rows from a Halo report based on the given alert report filter
-    $ReportResults = (Set-HaloReport -Report $AlertReportFilter).report.rows
+    # $ReportResults = (Set-HaloReport -Report $AlertReportFilter).report.rows
 
     # Filter the report results to find any history of recurring alerts that match the specific alert type
-    $ReoccuringHistory = $ReportResults | where-object { $_.CFDattoAlertType -eq $ParsedAlertType } 
+    # $ReoccuringHistory = $ReportResults | where-object { $_.CFDattoAlertType -eq $ParsedAlertType } 
     
     # Further filter the recurring alerts to find those that occurred within the specified time frame
-    $ReoccuringAlerts = $ReoccuringHistory | where-object { $_.dateoccured -gt ((Get-Date).addhours(-$ReoccurringTicketHours)) }
+    # $ReoccuringAlerts = $ReoccuringHistory | where-object { $_.dateoccured -gt ((Get-Date).addhours(-$ReoccurringTicketHours)) }
 
     # Find related alerts that occurred within a different specified time frame and are of a different alert type
-    $RelatedAlerts = $ReportResults | where-object { $_.dateoccured -gt ((Get-Date).addminutes(-$RelatedAlertMinutes)).ToUniversalTime() -and $_.CFDattoAlertType -ne $ParsedAlertType }
+    # $RelatedAlerts = $ReportResults | where-object { $_.dateoccured -gt ((Get-Date).addminutes(-$RelatedAlertMinutes)).ToUniversalTime() -and $_.CFDattoAlertType -ne $ParsedAlertType }
     
     # Capture the subject of the email alert
     $TicketSubject = $Email.Subject
@@ -147,7 +141,7 @@ if ($Email) {
     $HTMLBody = $Email.Body
     
     # Handle large HTML content intelligently to preserve critical data
-    $MaxBodyLength = 3000000  # 3MB limit - reasonable for rich HTML content with charts and tables
+    $MaxBodyLength = Get-AlertingConfig -Path "AlertThresholds.HtmlBodyMaxLength" -DefaultValue 3000000
     $OriginalBodyLength = $HTMLBody.Length
     
     if ($OriginalBodyLength -gt $MaxBodyLength) {
@@ -201,14 +195,14 @@ if ($Email) {
 
     $HaloTicketCreate = @{
         summary          = $TicketSubject
-        tickettype_id    = 8
+        tickettype_id    = Get-AlertingConfig -Path "TicketDefaults.TicketTypeId" -DefaultValue 8
         details_html     = $HtmlBody
         DattoAlertState  = 0
         site_id          = $HaloSiteIDDatto
         assets           = @(@{id = $HaloDevice.did })
         priority_id      = $HaloPriority
         status_id        = $HaloTicketStatusID
-        category_1       = "Datto Alert"
+        category_1       = Get-AlertingConfig -Path "TicketDefaults.Category1" -DefaultValue "Datto Alert"
         contract_id      = $LatestContractId
         customfields     = @(
             @{
@@ -264,7 +258,7 @@ if ($Email) {
     
     if ($Request.Body.resolvedAlert -eq "true") {
         Write-Host "Resolved Closing $ticketidHalo"
-        if ($ticketidHalo -ne $null){
+        if ($null -ne $ticketidHalo){
             $TicketID = $ticketidHalo
         
             $TicketUpdate = @{
@@ -293,7 +287,7 @@ if ($Email) {
                 lines = @(@{entity_type = "labour";ticket_id = $TicketID})
             }
 
-            $supress = New-HaloInvoice -Invoice $invoice 
+            $null = New-HaloInvoice -Invoice $invoice 
         }
         
     } else {
