@@ -500,7 +500,7 @@ function Update-ExistingSecurityTicket {
         $noteTemplate = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationNoteTemplate" -DefaultValue "Additional {AlertType} alert detected at {Timestamp}. Total occurrences: {Count}"
         
         # Check if we've reached max consolidation limit
-        $currentNotes = Get-HaloTicket -TicketID $ExistingTicket.id -IncludeDetails -FullObjects
+        $currentNotes = Get-HaloTicket -TicketID $ExistingTicket.id -IncludeDetails
         $consolidationNotes = $currentNotes.actions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" }
         $currentCount = $consolidationNotes.Count + 1 # +1 for the original ticket
         

@@ -4,6 +4,8 @@ using namespace Microsoft.Azure.Cosmos.Table
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
 
+# Start performance tracking
+$startTime = Get-Date
 Write-Host "Processing Webhook for Alert with the UID of - $($Request.Body.alertUID) -"
 
 #Respond Request Ok
@@ -57,12 +59,16 @@ $PriorityHaloMap = Get-AlertingConfig -Path "PriorityMapping" -DefaultValue @{
 $AlertWebhook = $Request.Body
 
 $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
+$emailTime = Get-Date
+Write-Host "Email generation took: $((New-TimeSpan -Start $startTime -End $emailTime).TotalSeconds) seconds"
 
 if ($Email) {
     $Alert = $Email.Alert
 
     #Connect to the halo api with the env vars
     Connect-HaloAPI -URL $HaloURL -ClientId $HaloClientID -ClientSecret $HaloClientSecret -Scopes "all"
+    $haloConnectTime = Get-Date
+    Write-Host "Halo API connection took: $((New-TimeSpan -Start $emailTime -End $haloConnectTime).TotalSeconds) seconds"
     
     # Check if Device Report already exists, if not create it
     $ExistingDeviceReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Device Report"
@@ -176,9 +182,16 @@ if ($Email) {
     
     Write-Host "Client ID in Halo - $($HaloClientDattoMatch)"
     
-    $Contracts = (Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects)
-
-    Write-Host "Contracts for client ID - $($Contracts)"
+    # Optimize contract retrieval - only get what we need
+    try {
+        $Contracts = Get-HaloContract -ClientID $HaloClientDattoMatch
+        Write-Host "Contracts for client ID - $($Contracts.Count) contracts found"
+    }
+    catch {
+        Write-Warning "Error retrieving contracts: $($_.Exception.Message)"
+        # Use default site if contract lookup fails
+        $Contracts = @()
+    }
 
     $FilteredContracts = $Contracts | Where-Object { #Internal work ref to stop false contracts selection from Halo when finishing internal alerts 
         ($_.ref -like '*M' -and $_.site_id -eq $HaloSiteIDDatto) -or
@@ -216,44 +229,52 @@ if ($Email) {
         )
     }
 
-    # Your command to get tickets
-    $TicketidGet = Get-HaloTicket -Category1 145 -OpenOnly -FullObjects
-
-    # The UID you are looking for
+    # Check for existing ticket with this alert UID more efficiently
+    # Instead of getting ALL tickets, search specifically for this UID
+    $ticketidHalo = $null
     $targetUID = $Request.Body.alertUID
-
-    # Iterate over each ticket in the result
-    foreach ($ticket in $TicketidGet) {
-        # Access the custom fields
-        $customFields = $ticket.customfields
-
-        # Find the field with name 'CFDattoAlertUID'
-        $dattoAlertUIDField = $customFields | Where-Object { $_.name -eq 'CFDattoAlertUID' }
-
-        # Check if the value of this field matches the target UID
-        if ($dattoAlertUIDField -and $dattoAlertUIDField.value -eq $targetUID) {
-            # Output the matching ticket ID
-            Write-Output "Found matching ticket: ID is $($ticket.id)"
-            $ticketidHalo = $ticket.id
-            $dateArrival = (get-date((get-date).AddMinutes(-5)))
-            $dateEnd = (get-date) 
-            Write-Output "Date Arrival $($dateArrival) and end $($dateEnd)"
-            
-            $ActionUpdate = @{
-                ticket_id         = $ticket.id
-                actionid          = 23
-                outcome           = "Remote"
-                outcome_id        = 23
-                note              = "Resolved by Datto Automation"
-                actionarrivaldate = $dateArrival
-                actioncompletiondate = $dateEnd
-                action_isresponse = $false
-                validate_response = $false
-                sendemail         = $false
+    
+    # Try to find existing ticket by searching for the alert UID
+    try {
+        # Search for tickets containing the alert UID in a more targeted way
+        $existingTickets = Get-HaloTicket -Search $targetUID -OpenOnly
+        
+        if ($existingTickets) {
+            foreach ($ticket in $existingTickets) {
+                # Get full details only for potential matches to check custom fields
+                $fullTicket = Get-HaloTicket -TicketID $ticket.id -IncludeDetails
+                $customFields = $fullTicket.customfields
+                $dattoAlertUIDField = $customFields | Where-Object { $_.name -eq 'CFDattoAlertUID' }
+                
+                if ($dattoAlertUIDField -and $dattoAlertUIDField.value -eq $targetUID) {
+                    Write-Output "Found matching ticket: ID is $($ticket.id)"
+                    $ticketidHalo = $ticket.id
+                    $dateArrival = (get-date((get-date).AddMinutes(-5)))
+                    $dateEnd = (get-date) 
+                    Write-Output "Date Arrival $($dateArrival) and end $($dateEnd)"
+                    
+                    $ActionUpdate = @{
+                        ticket_id         = $ticket.id
+                        actionid          = 23
+                        outcome           = "Remote"
+                        outcome_id        = 23
+                        note              = "Resolved by Datto Automation"
+                        actionarrivaldate = $dateArrival
+                        actioncompletiondate = $dateEnd
+                        action_isresponse = $false
+                        validate_response = $false
+                        sendemail         = $false
+                    }
+                    $Null = New-HaloAction -Action $ActionUpdate
+                    Write-Host "Adding ticket entry $ActionUpdate"
+                    break # Found our ticket, no need to continue
+                }
             }
-            $Null = New-HaloAction -Action $ActionUpdate
-            Write-Host "Adding ticket entry $ActionUpdate"
         }
+    }
+    catch {
+        Write-Warning "Error searching for existing tickets: $($_.Exception.Message)"
+        # Continue processing normally if search fails
     }
     
     if ($Request.Body.resolvedAlert -eq "true") {
@@ -319,6 +340,15 @@ if ($Email) {
         }
     }
     #$HaloTicketCreate | Out-String | Write-Host #Enable for Debugging
+    
+    # Performance logging
+    $endTime = Get-Date
+    $totalDuration = New-TimeSpan -Start $startTime -End $endTime
+    Write-Host "Total processing time: $($totalDuration.TotalSeconds) seconds"
+    
 } else {
         Write-Host "No alert found. This webhook shouldn't be triggered this way except when testing!!!!"
+        $endTime = Get-Date
+        $totalDuration = New-TimeSpan -Start $startTime -End $endTime
+        Write-Host "Total processing time (no alert): $($totalDuration.TotalSeconds) seconds"
 }
