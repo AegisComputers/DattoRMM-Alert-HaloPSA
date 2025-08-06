@@ -415,7 +415,8 @@ function Find-ExistingSecurityAlert {
     try {
         # Get configuration for search
         $windowHours = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationWindowHours" -DefaultValue 24
-        $searchStatuses = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationSearchStatuses" -DefaultValue @("Open", "In Progress")
+        
+        Write-Host "Consolidation window: $windowHours hours"
         
         # Build search query - looking for tickets with similar subject pattern
         # The actual format is: "Device: hostname raised Alert: AlertType - AlertMessage"
@@ -424,31 +425,25 @@ function Find-ExistingSecurityAlert {
         
         Write-Host "Searching for existing tickets matching pattern: $searchPattern"
         
-        # Search for tickets using Halo API - try broader search first
+        # Search for tickets using Halo API with -OpenOnly (so all results are already open)
         $searchResults = Get-HaloTicket -Search "Device: $DeviceName" -OpenOnly -FullObjects
         
-        Write-Host "Search returned $($searchResults.Count) results for device: $DeviceName"
+        Write-Host "Search returned $($searchResults.Count) open tickets for device: $DeviceName"
         
         if ($searchResults -and $searchResults.Count -gt 0) {
-            # Filter results by status, date, and alert type
+            # Filter results by date and alert type - no need to check status since -OpenOnly guarantees open tickets
             foreach ($ticket in $searchResults) {
                 # Check if ticket summary contains our alert type
                 if ($ticket.summary -like "*$AlertType*") {
-                    # Check if ticket status matches our search criteria
-                    $ticketStatus = $ticket.status_name
-                    if ($ticketStatus -in $searchStatuses) {
-                        # Check if ticket is within our time window
-                        $ticketDate = [DateTime]::Parse($ticket.dateoccured)
-                        $cutoffDate = (Get-Date).AddHours(-$windowHours)
-                        
-                        if ($ticketDate -gt $cutoffDate) {
-                            Write-Host "Found existing ticket for consolidation: ID $($ticket.id) - $($ticket.summary)"
-                            return $ticket
-                        } else {
-                            Write-Host "Ticket $($ticket.id) is outside time window (created $ticketDate, cutoff $cutoffDate)"
-                        }
+                    # Check if ticket is within our time window
+                    $ticketDate = [DateTime]::Parse($ticket.dateoccured)
+                    $cutoffDate = (Get-Date).AddHours(-$windowHours)
+                    
+                    if ($ticketDate -gt $cutoffDate) {
+                        Write-Host "Found existing open ticket for consolidation: ID $($ticket.id) - $($ticket.summary)"
+                        return $ticket
                     } else {
-                        Write-Host "Ticket $($ticket.id) status '$ticketStatus' not in search statuses"
+                        Write-Host "Ticket $($ticket.id) is outside time window (created $ticketDate, cutoff $cutoffDate)"
                     }
                 } else {
                     Write-Host "Ticket $($ticket.id) does not contain alert type '$AlertType' in summary: $($ticket.summary)"
