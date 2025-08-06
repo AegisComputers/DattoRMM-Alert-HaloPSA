@@ -456,12 +456,27 @@ function Get-StorageTable {
     param (
         [string]$tableName
     )
-    $storageContext = Get-StorageContext
-    $table = Get-AzStorageTable -Context $storageContext -Name $tableName -ErrorAction SilentlyContinue
-    if (-not $table) {
-        $table = New-AzStorageTable -Context $storageContext -Name $tableName
+    try {
+        $storageContext = Get-StorageContext
+        $table = Get-AzStorageTable -Context $storageContext -Name $tableName -ErrorAction SilentlyContinue
+        if (-not $table) {
+            # Use try-catch to handle race conditions where table might be created by another process
+            try {
+                $table = New-AzStorageTable -Context $storageContext -Name $tableName
+            } catch {
+                # If creation fails (e.g., already exists), try to get it again
+                Start-Sleep -Milliseconds 100  # Brief pause to allow other process to complete
+                $table = Get-AzStorageTable -Context $storageContext -Name $tableName -ErrorAction SilentlyContinue
+                if (-not $table) {
+                    throw "Failed to create or retrieve storage table '$tableName': $($_.Exception.Message)"
+                }
+            }
+        }
+        return $table.CloudTable
+    } catch {
+        Write-Error "Storage table operation failed for '$tableName': $($_.Exception.Message)"
+        throw
     }
-    return $table.CloudTable
 }
 
 # Function to insert or merge entity
@@ -483,12 +498,131 @@ function GetEntity {
     )
     try {
         $entity = Get-AzTableRow -RowKey $rowKey -Table $table -PartitionKey $partitionKey
-        if ($entity -ne $null) {            
+        if ($null -ne $entity) {            
             return $entity
         } else {           
             return $null
         }
     } catch {
         return $null
+    }
+}
+
+function Optimize-HtmlContentForTicket {
+    param(
+        [string]$OriginalHtml,
+        [int]$MaxLength,
+        [object]$Request,
+        [string]$TicketSubject
+    )
+    
+    # Ensure we never exceed the absolute limit - leave some buffer for safety
+    $SafeMaxLength = [Math]::Min($MaxLength, 2900000)  # 2.9MB safe limit (100KB buffer below 3MB hard limit)
+    
+    # First try: compress whitespace and unnecessary formatting
+    $CompressedHTMLBody = $OriginalHtml -replace '\s{2,}', ' ' -replace '>\s+<', '><' -replace '\r?\n\s*', ''
+    
+    if ($CompressedHTMLBody.Length -le $SafeMaxLength) {
+        Write-Host "HTML optimized through compression: $($CompressedHTMLBody.Length) characters"
+        return $CompressedHTMLBody
+    }
+    
+    Write-Host "Creating streamlined version that preserves key alert sections..."
+    
+    # Extract key sections from the HTML - preserve critical data
+    $AlertDetailsMatch = if ($OriginalHtml -match '(?s)<!-- Alert Detaills HTML Start -->.*?<!-- Alert Details HTML End -->') { 
+        # Compress this section too
+        $matches[0] -replace '\s{2,}', ' ' -replace '>\s+<', '><'
+    } else { '' }
+    
+    $DeviceDetailsMatch = if ($OriginalHtml -match '(?s)<!-- Device Details HTML Start -->.*?<!-- Device Details HTML End -->') { 
+        # Compress this section too
+        $matches[0] -replace '\s{2,}', ' ' -replace '>\s+<', '><'
+    } else { '' }
+    
+    # Extract device hostname and alert info for summary
+    $DeviceHostname = if ($OriginalHtml -match 'Device:\s*([^<\s]+)') { $matches[1] } else { "Unknown Device" }
+    $AlertPriority = if ($OriginalHtml -match '(\w+)\s+Alert\s+-\s+Site:') { $matches[1] } else { "Unknown Priority" }
+    
+    # Create streamlined version with essential alert data
+    $StreamlinedHTMLBody = @"
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Alert Details</title></head>
+<body style="font-family: sans-serif; margin: 20px; background: #f5f5f5;">
+<div style="max-width: 800px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+<h2 style="color: #d32f2f; margin-top: 0;">$AlertPriority Alert - Device: $DeviceHostname</h2>
+<div style="background: #fff3e0; padding: 15px; margin: 15px 0; border-left: 4px solid #ff9800; border-radius: 4px;">
+<h3 style="margin-top: 0; color: #e65100;">Alert Information</h3>
+<table style="width: 100%; border-collapse: collapse;">
+<tr><td style="padding: 5px 10px; font-weight: bold;">Alert UID:</td><td style="padding: 5px 10px;">$($Request.Body.alertUID)</td></tr>
+<tr><td style="padding: 5px 10px; font-weight: bold;">Device:</td><td style="padding: 5px 10px;">$DeviceHostname</td></tr>
+<tr><td style="padding: 5px 10px; font-weight: bold;">Priority:</td><td style="padding: 5px 10px;">$AlertPriority</td></tr>
+<tr><td style="padding: 5px 10px; font-weight: bold;">Site:</td><td style="padding: 5px 10px;">$($Request.Body.dattoSiteDetails)</td></tr>
+<tr><td style="padding: 5px 10px; font-weight: bold;">Subject:</td><td style="padding: 5px 10px;">$TicketSubject</td></tr>
+</table></div>
+$AlertDetailsMatch
+<div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 4px;">
+<h4 style="margin-top: 0; color: #1976d2;">Content Optimization Notice</h4>
+<p>This alert has been optimized for transmission while preserving key data.</p>
+<p><strong>Original size:</strong> $($OriginalHtml.Length) characters | <strong>Optimized size:</strong> [FINAL_SIZE] characters</p>
+<p>For complete details including device status charts and alert history, please check the original alert in Datto RMM.</p>
+</div>
+$DeviceDetailsMatch
+</div></body></html>
+"@
+    
+    # Check if streamlined version fits within limits
+    if ($StreamlinedHTMLBody.Length -gt $SafeMaxLength) {
+        Write-Host "Streamlined version still too large, creating minimal version..."
+        
+        # If alert details are too large, truncate them but preserve structure
+        if ($AlertDetailsMatch.Length -gt 100000) {  # If alert details > 100KB
+            $TruncatedAlertDetails = $AlertDetailsMatch.Substring(0, 50000) + "... [Alert details truncated]"
+            $AlertDetailsMatch = $TruncatedAlertDetails
+        }
+        
+        # Recreate streamlined version with potentially truncated content
+        $StreamlinedHTMLBody = @"
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Alert Details</title></head>
+<body style="font-family: sans-serif; margin: 20px; background: #f5f5f5;">
+<div style="max-width: 800px; background: white; padding: 20px; border-radius: 8px;">
+<h2 style="color: #d32f2f;">$AlertPriority Alert - Device: $DeviceHostname</h2>
+<div style="background: #fff3e0; padding: 15px; margin: 15px 0; border-left: 4px solid #ff9800;">
+<h3 style="color: #e65100;">Alert Information</h3>
+<table style="width: 100%; border-collapse: collapse;">
+<tr><td style="padding: 5px 10px; font-weight: bold;">Alert UID:</td><td style="padding: 5px 10px;">$($Request.Body.alertUID)</td></tr>
+<tr><td style="padding: 5px 10px; font-weight: bold;">Device:</td><td style="padding: 5px 10px;">$DeviceHostname</td></tr>
+<tr><td style="padding: 5px 10px; font-weight: bold;">Priority:</td><td style="padding: 5px 10px;">$AlertPriority</td></tr>
+<tr><td style="padding: 5px 10px; font-weight: bold;">Site:</td><td style="padding: 5px 10px;">$($Request.Body.dattoSiteDetails)</td></tr>
+</table></div>
+$AlertDetailsMatch
+<div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3;">
+<p><strong>Note:</strong> Content optimized from $($OriginalHtml.Length) characters. Check Datto RMM for complete details.</p>
+</div></div></body></html>
+"@
+        
+        # Final safety check - if still too large, create ultra-minimal version
+        if ($StreamlinedHTMLBody.Length -gt $SafeMaxLength) {
+            Write-Host "Creating ultra-minimal version to ensure compliance with 3MB limit..."
+            $MinimalHTMLBody = @"
+<div style="font-family: sans-serif; color: #333; padding: 20px; max-width: 600px;">
+<h2 style="color: #d32f2f;">$AlertPriority Alert - $DeviceHostname</h2>
+<table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Alert UID:</td><td style="padding: 8px;">$($Request.Body.alertUID)</td></tr>
+<tr><td style="padding: 8px; font-weight: bold;">Device:</td><td style="padding: 8px;">$DeviceHostname</td></tr>
+<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Priority:</td><td style="padding: 8px;">$AlertPriority</td></tr>
+<tr><td style="padding: 8px; font-weight: bold;">Site:</td><td style="padding: 8px;">$($Request.Body.dattoSiteDetails)</td></tr>
+</table>
+<p style="background: #fff3e0; padding: 10px; border-left: 3px solid #ff9800; margin: 15px 0;">
+<strong>Note:</strong> Alert content minimized from $($OriginalHtml.Length) characters to comply with size limits. Check Datto RMM for complete details.
+</p></div>
+"@
+            return $MinimalHTMLBody
+        }
+        
+        $FinalSize = $StreamlinedHTMLBody.Length
+        return $StreamlinedHTMLBody -replace '\[FINAL_SIZE\]', $FinalSize
+    } else {
+        $FinalSize = $StreamlinedHTMLBody.Length
+        return $StreamlinedHTMLBody -replace '\[FINAL_SIZE\]', $FinalSize
     }
 }

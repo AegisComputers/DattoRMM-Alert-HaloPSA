@@ -71,26 +71,43 @@ if ($Email) {
     #Connect to the halo api with the env vars
     Connect-HaloAPI -URL $HaloURL -ClientId $HaloClientID -ClientSecret $HaloClientSecret -Scopes "all"
     
-    $HaloDeviceReport = @{
-        name                    = "Datto RMM Improved Alerts PowerShell Function - Device Report"
-        sql                     = "Select did, Dsite, DDattoID, DDattoAlternateId from device"
-        description             = "This report is used to quickly obtain device mapping information for use with the improved Datto RMM Alerts Function"
-        type                    = 0
-        datasource_id           = 0
-        canbeaccessedbyallusers = $false
+    # Check if Device Report already exists, if not create it
+    $ExistingDeviceReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Device Report"
+    if ($ExistingDeviceReports -and $ExistingDeviceReports.Count -gt 0) {
+        $HaloDeviceReport = $ExistingDeviceReports[0]
+        Write-Host "Using existing Device Report with ID: $($HaloDeviceReport.id)"
+    } else {
+        $HaloDeviceReport = @{
+            name                    = "Datto RMM Improved Alerts PowerShell Function - Device Report"
+            sql                     = "Select did, Dsite, DDattoID, DDattoAlternateId from device"
+            description             = "This report is used to quickly obtain device mapping information for use with the improved Datto RMM Alerts Function"
+            type                    = 0
+            datasource_id           = 0
+            canbeaccessedbyallusers = $false
+        }
+        $HaloDeviceReport = New-HaloReport -Report $HaloDeviceReport
+        Write-Host "Created new Device Report with ID: $($HaloDeviceReport.id)"
     }
-
     $ParsedAlertType = Get-AlertHaloType -Alert $Alert -AlertMessage $AlertWebhook.alertMessage
 
     $HaloDevice = Invoke-HaloReport -Report $HaloDeviceReport -IncludeReport | where-object { $_.DDattoID -eq $Alert.alertSourceInfo.deviceUid }
 
-    $HaloAlertsReportBase = @{
-        name                    = "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
-        sql                     = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
-        description             = "This report is used to quickly obtain alert information for use with the improved Datto RMM Alerts Function"
-        type                    = 0
-        datasource_id           = 0
-        canbeaccessedbyallusers = $false
+    # Check if Alerts Report already exists, if not create it
+    $ExistingAlertsReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
+    if ($ExistingAlertsReports -and $ExistingAlertsReports.Count -gt 0) {
+        $HaloAlertsReportBase = $ExistingAlertsReports[0]
+        Write-Host "Using existing Alerts Report with ID: $($HaloAlertsReportBase.id)"
+    } else {
+        $HaloAlertsReportBase = @{
+            name                    = "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
+            sql                     = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
+            description             = "This report is used to quickly obtain alert information for use with the improved Datto RMM Alerts Function"
+            type                    = 0
+            datasource_id           = 0
+            canbeaccessedbyallusers = $false
+        }
+        $HaloAlertsReportBase = New-HaloReport -Report $HaloAlertsReportBase
+        Write-Host "Created new Alerts Report with ID: $($HaloAlertsReportBase.id)"
     }
 
     $HaloAlertsReport = Invoke-HaloReport -Report $HaloAlertsReportBase
@@ -128,6 +145,19 @@ if ($Email) {
 
     # Capture the body content of the email alert in HTML format
     $HTMLBody = $Email.Body
+    
+    # Handle large HTML content intelligently to preserve critical data
+    $MaxBodyLength = 3000000  # 3MB limit - reasonable for rich HTML content with charts and tables
+    $OriginalBodyLength = $HTMLBody.Length
+    
+    if ($OriginalBodyLength -gt $MaxBodyLength) {
+        Write-Host "HTML body is large ($OriginalBodyLength characters). Optimizing for API transmission..."
+        
+        # Use helper function to optimize HTML content
+        $HTMLBody = Optimize-HtmlContentForTicket -OriginalHtml $HTMLBody -MaxLength $MaxBodyLength -Request $Request -TicketSubject $TicketSubject
+        
+        Write-Host "Final HTML body size: $($HTMLBody.Length) characters (reduced from $OriginalBodyLength)"
+    }
 
     # Map the priority of the alert to the corresponding Halo priority using the priority mapping
     $HaloPriority = $PriorityHaloMap."$($Alert.Priority)"

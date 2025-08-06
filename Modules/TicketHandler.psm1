@@ -32,6 +32,67 @@ $table = Get-StorageTable -Context $context -TableName $tableName
 ## Global cache for online error lookups
 $global:OnlineErrorCache = @{}
 
+function New-HaloTicketWithFallback {
+    param ($HaloTicketCreate)
+
+    try {
+        $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+        Write-Host "Ticket created successfully with ID: $($Ticket.id)"
+        return $Ticket
+    }
+    catch {
+        Write-Error "Failed to create Halo ticket: $($_.Exception.Message)"
+        
+        # If it's a timeout error, try with minimal details
+        if ($_.Exception.Message -like "*504*" -or $_.Exception.Message -like "*timeout*" -or $_.Exception.Message -like "*Gateway Time-out*") {
+            Write-Host "Attempting to create ticket with minimal details due to timeout..."
+            $HaloTicketCreateFallback = $HaloTicketCreate.Clone()
+            
+            # Create a very basic ticket with essential information only
+            $AlertUID = ($HaloTicketCreate.customfields | Where-Object { $_.id -eq $env:DattoAlertUIDField }).value
+            $TicketSummary = $HaloTicketCreate.summary
+            
+            # Use helper function to create minimal content
+            $MinimalContent = New-MinimalTicketContent -TicketSummary $TicketSummary -AlertUID $AlertUID
+            $HaloTicketCreateFallback.details_html = $MinimalContent
+            
+            try {
+                $Ticket = New-HaloTicket -Ticket $HaloTicketCreateFallback
+                Write-Host "Fallback ticket created successfully with ID: $($Ticket.id)"
+                return $Ticket
+            }
+            catch {
+                Write-Error "Failed to create fallback ticket: $($_.Exception.Message)"
+                throw
+            }
+        }
+        else {
+            throw
+        }
+    }
+}
+
+function New-MinimalTicketContent {
+    param(
+        [string]$TicketSummary,
+        [string]$AlertUID
+    )
+    
+    return @"
+<div style="font-family: sans-serif; padding: 15px; max-width: 600px;">
+<h3 style="color: #d32f2f;">Alert Created - API Timeout Recovery</h3>
+<table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Summary:</td><td style="padding: 8px;">$TicketSummary</td></tr>
+<tr><td style="padding: 8px; font-weight: bold;">Alert UID:</td><td style="padding: 8px;">$AlertUID</td></tr>
+<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Status:</td><td style="padding: 8px;">Ticket created with minimal content due to API timeout.</td></tr>
+</table>
+<div style="background: #fff3e0; padding: 10px; margin: 10px 0; border-left: 3px solid #ff9800;">
+<strong>Note:</strong> Original alert content was too large for API transmission. 
+Please check the original alert in Datto RMM using the Alert UID above for complete details.
+</div></div>
+"@
+}
+
 function Get-WindowsErrorMessage {
     param(
         [Parameter(Mandatory = $true)]
@@ -159,7 +220,7 @@ function Handle-DiskUsageAlert {
     $Username = $LastUser -replace '^[^\\]*\\', ''
 
     Write-Host "Creating Ticket"
-    $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+    $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 
     try {
         FindAndSendHaloResponse -Username $Username `
@@ -199,7 +260,7 @@ function Handle-HyperVReplicationAlert {
     if ($CurrentTimeUK -ge $StartTime -and $CurrentTimeUK -lt $EndTime) {
         Write-Output "The current time is between 9 AM and 5:30 PM UK time. A ticket will be created!"
         Write-Host "Creating Ticket"
-        $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+        $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
     } else {
         Write-Output "The current time is outside of 9 AM and 5:30 PM UK time. No ticket will be created!"
         Set-DrmmAlertResolve -alertUid $alertUID
@@ -219,7 +280,7 @@ function Handle-PatchMonitorAlert {
     $AlertID = $AlertWebhook.alertUID
     $AlertDRMM = Get-DrmmAlert -alertUid $AlertID
 
-    if ($AlertDRMM -ne $null) {
+    if ($null -ne $AlertDRMM) {
         # Retrieve the device details and extract the hostname.
         $Device = Get-DrmmDevice -deviceUid $AlertDRMM.alertSourceInfo.deviceUid
         $DeviceHostname = $Device.hostname
@@ -230,27 +291,45 @@ function Handle-PatchMonitorAlert {
 
         # Get the table reference.
         $table = Get-StorageTable -tableName $tableName
-        $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
+        
+        # Use try-catch to handle potential race conditions in storage operations
+        try {
+            $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
 
-        if ($entity -eq $null) {
-            # Create a new entity with an initial AlertCount of 1.
-            $entity = [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]::new($partitionKey, $rowKey)
-            $entity.Properties.Add("AlertCount", [Microsoft.Azure.Cosmos.Table.EntityProperty]::GeneratePropertyForInt(1))
-            InsertOrMergeEntity -table $table -entity $entity
-        } else {
-            # Increment the alert count and update the entity.
-            $entity.AlertCount++
-            Update-AzTableRow -Table $table -entity $entity
-        }
+            if ($entity -eq $null) {
+                # Create a new entity with an initial AlertCount of 1.
+                # Use InsertOrMerge to handle race conditions where entity might be created by another process
+                $entity = [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]::new($partitionKey, $rowKey)
+                $entity.Properties.Add("AlertCount", [Microsoft.Azure.Cosmos.Table.EntityProperty]::GeneratePropertyForInt(1))
+                $result = InsertOrMergeEntity -table $table -entity $entity
+                
+                # Re-fetch the entity to get current state after potential merge
+                $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
+            } else {
+                # Increment the alert count and update the entity.
+                $entity.AlertCount++
+                Update-AzTableRow -Table $table -entity $entity
+            }
 
-        # Check if the alert threshold is met or exceeded.
-        $threshold = 2
-        if ($entity.AlertCount -ge $threshold) {
-            Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
-            Write-Host "Creating Ticket"
-            $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
-            # Clean up the record from the table after handling the alert.
-            remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
+            # Check if the alert threshold is met or exceeded.
+            $threshold = 2
+            if ($entity.AlertCount -ge $threshold) {
+                Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
+                Write-Host "Creating Ticket"
+                $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+                
+                # Clean up the record from the table after handling the alert.
+                try {
+                    remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
+                } catch {
+                    Write-Warning "Failed to clean up storage table row for $DeviceHostname`: $($_.Exception.Message)"
+                }
+            }
+        } catch {
+            Write-Warning "Storage operation failed for device $DeviceHostname`: $($_.Exception.Message). Proceeding without storage tracking."
+            # If storage fails, create ticket anyway to ensure alert is handled
+            Write-Host "Creating Ticket (storage bypass)"
+            $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
         }
     } else {
         Write-Host "Alert missing in Datto RMM, no further action..."
@@ -262,7 +341,7 @@ function Handle-BackupExecAlert {
 
     Write-Host "Backup Exec Alert Detected"
     Write-Host "Creating Ticket"
-    $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+    $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
 
 function Handle-HostsAlert {
@@ -270,12 +349,12 @@ function Handle-HostsAlert {
 
     Write-Host "Hosts Alert Detected"
     Write-Host "Creating Ticket"
-    $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+    $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
 
 function Handle-DefaultAlert {
     param ($HaloTicketCreate)
 
     Write-Host "Creating Ticket without additional processing!"
-    $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
+    $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
