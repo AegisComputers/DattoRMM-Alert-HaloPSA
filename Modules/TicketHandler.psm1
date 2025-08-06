@@ -79,17 +79,21 @@ function New-MinimalTicketContent {
     )
     
     return @"
-<div style="font-family: sans-serif; padding: 15px; max-width: 600px;">
-<h3 style="color: #d32f2f;">Alert Created - API Timeout Recovery</h3>
-<table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
-<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Summary:</td><td style="padding: 8px;">$TicketSummary</td></tr>
-<tr><td style="padding: 8px; font-weight: bold;">Alert UID:</td><td style="padding: 8px;">$AlertUID</td></tr>
-<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Status:</td><td style="padding: 8px;">Ticket created with minimal content due to API timeout.</td></tr>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%;" bgcolor="#333333" width="100%">
+<tbody><tr><td style="width: 100%; margin: 0; padding: 16px;" align="left" bgcolor="#333333" width="100%">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#222222;">
+<tr><td style="padding: 15px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #ffffff;">
+<h3 style="color: #ffffff; margin-top: 0;">Alert Created - API Timeout Recovery</h3>
+<table style="width: 100%; border-collapse: collapse; margin: 10px 0; color: #ffffff;">
+<tr style="background-color: #333333;"><td style="padding: 8px; font-weight: bold; color: #ffffff;">Summary:</td><td style="padding: 8px; color: #ffffff;">$TicketSummary</td></tr>
+<tr><td style="padding: 8px; font-weight: bold; color: #ffffff;">Alert UID:</td><td style="padding: 8px; color: #ffffff;">$AlertUID</td></tr>
+<tr style="background-color: #333333;"><td style="padding: 8px; font-weight: bold; color: #ffffff;">Status:</td><td style="padding: 8px; color: #ffffff;">Ticket created with minimal content due to API timeout.</td></tr>
 </table>
-<div style="background: #fff3e0; padding: 10px; margin: 10px 0; border-left: 3px solid #ff9800;">
-<strong>Note:</strong> Original alert content was too large for API transmission. 
+<div style="background-color: #333333; padding: 10px; margin: 10px 0; border-left: 3px solid #ff9800; color: #ffffff;">
+<strong style="color: #ffffff;">Note:</strong> Original alert content was too large for API transmission. 
 Please check the original alert in Datto RMM using the Alert UID above for complete details.
-</div></div>
+</div>
+</td></tr></table></td></tr></tbody></table>
 "@
 }
 

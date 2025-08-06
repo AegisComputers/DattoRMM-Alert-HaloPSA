@@ -544,30 +544,103 @@ function Optimize-HtmlContentForTicket {
     $DeviceHostname = if ($OriginalHtml -match 'Device:\s*([^<\s]+)') { $matches[1] } else { "Unknown Device" }
     $AlertPriority = if ($OriginalHtml -match '(\w+)\s+Alert\s+-\s+Site:') { $matches[1] } else { "Unknown Priority" }
     
-    # Create streamlined version with essential alert data
+    # Get the priority-specific styling to match original template
+    $PriorityStyle = switch ($AlertPriority) {
+        'Critical' { 'background-color:#EC422E; color:#1C3E4C' }
+        'High' { 'background-color:#F68218; color:#1C3E4C' }
+        'Moderate' { 'background-color:#F7C210; color:#1C3E4C' }
+        'Low' { 'background-color:#2C81C8; color:#ffffff' }
+        default { 'color:#ffffff;' }
+    }
+    
+    # Create streamlined version using the exact same structure as original email template
     $StreamlinedHTMLBody = @"
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Alert Details</title></head>
-<body style="font-family: sans-serif; margin: 20px; background: #f5f5f5;">
-<div style="max-width: 800px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-<h2 style="color: #d32f2f; margin-top: 0;">$AlertPriority Alert - Device: $DeviceHostname</h2>
-<div style="background: #fff3e0; padding: 15px; margin: 15px 0; border-left: 4px solid #ff9800; border-radius: 4px;">
-<h3 style="margin-top: 0; color: #e65100;">Alert Information</h3>
-<table style="width: 100%; border-collapse: collapse;">
-<tr><td style="padding: 5px 10px; font-weight: bold;">Alert UID:</td><td style="padding: 5px 10px;">$($Request.Body.alertUID)</td></tr>
-<tr><td style="padding: 5px 10px; font-weight: bold;">Device:</td><td style="padding: 5px 10px;">$DeviceHostname</td></tr>
-<tr><td style="padding: 5px 10px; font-weight: bold;">Priority:</td><td style="padding: 5px 10px;">$AlertPriority</td></tr>
-<tr><td style="padding: 5px 10px; font-weight: bold;">Site:</td><td style="padding: 5px 10px;">$($Request.Body.dattoSiteDetails)</td></tr>
-<tr><td style="padding: 5px 10px; font-weight: bold;">Subject:</td><td style="padding: 5px 10px;">$TicketSubject</td></tr>
-</table></div>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style type="text/css">
+body, table, td, th, tr {
+  font-family: Helvetica, Arial, sans-serif !important;
+  color: #ffffff !important;
+}
+* {
+  color: #ffffff !important;
+}
+table:not([class^=s-]) {
+  font-family: Helvetica, Arial, sans-serif;
+  border-spacing: 0px;
+  border-collapse: collapse;
+  color: #ffffff !important;
+}
+table:not([class^=s-]) td {
+  border-spacing: 0px;
+  border-collapse: collapse;
+  color: #ffffff !important;
+}
+table, table tbody tr, table tbody td {
+  color: #ffffff !important;
+}
+</style>
+</head>
+<body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #ffffff;">
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%;" bgcolor="#333333" width="100%">
+<tbody>
+<tr>
+<td style="width: 100%; margin: 0; padding: 16px;" align="left" bgcolor="#333333" width="100%">
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 800px; margin: 0 auto;">
+<tbody>
+<tr>
+<td style="margin: 0;" align="left">
+
+<!-- Main content block matching original template structure -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#222222; margin-bottom: 20px;">
+<tr>
+<td style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #ffffff;">
+<h1 style="margin: 0 0 10px; font-size: 25px; line-height: 30px; font-weight: normal; $PriorityStyle">
+$AlertPriority Alert - Site: $($Request.Body.dattoSiteDetails) - Device: $DeviceHostname
+</h1>
+<br />
+<h3 style="color: #ffffff;">Alert Information:</h3>
+<table style="width: 100%; border-collapse: collapse; color: #ffffff; margin: 10px 0;">
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Alert UID:</td><td style="padding: 5px 10px; color: #ffffff;">$($Request.Body.alertUID)</td></tr>
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Device:</td><td style="padding: 5px 10px; color: #ffffff;">$DeviceHostname</td></tr>
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Priority:</td><td style="padding: 5px 10px; color: #ffffff;">$AlertPriority</td></tr>
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Site:</td><td style="padding: 5px 10px; color: #ffffff;">$($Request.Body.dattoSiteDetails)</td></tr>
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Subject:</td><td style="padding: 5px 10px; color: #ffffff;">$TicketSubject</td></tr>
+</table>
+<br />
+</td>
+</tr>
+</table>
+
 $AlertDetailsMatch
-<div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 4px;">
-<h4 style="margin-top: 0; color: #1976d2;">Content Optimization Notice</h4>
-<p>This alert has been optimized for transmission while preserving key data.</p>
-<p><strong>Original size:</strong> $($OriginalHtml.Length) characters | <strong>Optimized size:</strong> [FINAL_SIZE] characters</p>
-<p>For complete details including device status charts and alert history, please check the original alert in Datto RMM.</p>
-</div>
+
+<!-- Optimization notice block matching original style -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#222222; margin-top: 20px;">
+<tr>
+<td style="padding: 15px; font-family: sans-serif; font-size: 14px; line-height: 18px; color: #ffffff;">
+<h3 style="margin-top: 0; color: #ffffff;">Content Optimization Notice</h3>
+<p style="color: #ffffff; margin: 0 0 10px;">This alert has been optimized for transmission while preserving key data.</p>
+<p style="color: #ffffff; margin: 0 0 10px;"><strong>Original size:</strong> $($OriginalHtml.Length) characters | <strong>Optimized size:</strong> [FINAL_SIZE] characters</p>
+<p style="color: #ffffff; margin: 0;">For complete details including device status charts and alert history, please check the original alert in Datto RMM.</p>
+</td>
+</tr>
+</table>
+
 $DeviceDetailsMatch
-</div></body></html>
+
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
 "@
     
     # Check if streamlined version fits within limits
@@ -580,41 +653,73 @@ $DeviceDetailsMatch
             $AlertDetailsMatch = $TruncatedAlertDetails
         }
         
-        # Recreate streamlined version with potentially truncated content
+        # Recreate streamlined version with potentially truncated content using exact original styling
         $StreamlinedHTMLBody = @"
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Alert Details</title></head>
-<body style="font-family: sans-serif; margin: 20px; background: #f5f5f5;">
-<div style="max-width: 800px; background: white; padding: 20px; border-radius: 8px;">
-<h2 style="color: #d32f2f;">$AlertPriority Alert - Device: $DeviceHostname</h2>
-<div style="background: #fff3e0; padding: 15px; margin: 15px 0; border-left: 4px solid #ff9800;">
-<h3 style="color: #e65100;">Alert Information</h3>
-<table style="width: 100%; border-collapse: collapse;">
-<tr><td style="padding: 5px 10px; font-weight: bold;">Alert UID:</td><td style="padding: 5px 10px;">$($Request.Body.alertUID)</td></tr>
-<tr><td style="padding: 5px 10px; font-weight: bold;">Device:</td><td style="padding: 5px 10px;">$DeviceHostname</td></tr>
-<tr><td style="padding: 5px 10px; font-weight: bold;">Priority:</td><td style="padding: 5px 10px;">$AlertPriority</td></tr>
-<tr><td style="padding: 5px 10px; font-weight: bold;">Site:</td><td style="padding: 5px 10px;">$($Request.Body.dattoSiteDetails)</td></tr>
-</table></div>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+body, table, td, th, tr { font-family: Helvetica, Arial, sans-serif !important; color: #ffffff !important; }
+* { color: #ffffff !important; }
+table:not([class^=s-]) { font-family: Helvetica, Arial, sans-serif; border-spacing: 0px; border-collapse: collapse; color: #ffffff !important; }
+table:not([class^=s-]) td { border-spacing: 0px; border-collapse: collapse; color: #ffffff !important; }
+table, table tbody tr, table tbody td { color: #ffffff !important; }
+</style>
+</head>
+<body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #ffffff;">
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%;" bgcolor="#333333" width="100%">
+<tbody><tr><td style="width: 100%; margin: 0; padding: 16px;" align="left" bgcolor="#333333" width="100%">
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 800px; margin: 0 auto;">
+<tbody><tr><td style="margin: 0;" align="left">
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#222222;">
+<tr><td style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #ffffff;">
+<h1 style="margin: 0 0 10px; font-size: 25px; line-height: 30px; font-weight: normal; $PriorityStyle">
+$AlertPriority Alert - Site: $($Request.Body.dattoSiteDetails) - Device: $DeviceHostname
+</h1>
+<br />
+<h3 style="color: #ffffff;">Alert Information:</h3>
+<table style="width: 100%; border-collapse: collapse; color: #ffffff; margin: 10px 0;">
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Alert UID:</td><td style="padding: 5px 10px; color: #ffffff;">$($Request.Body.alertUID)</td></tr>
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Device:</td><td style="padding: 5px 10px; color: #ffffff;">$DeviceHostname</td></tr>
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Priority:</td><td style="padding: 5px 10px; color: #ffffff;">$AlertPriority</td></tr>
+<tr><td style="padding: 5px 0; font-weight: bold; color: #ffffff;">Site:</td><td style="padding: 5px 10px; color: #ffffff;">$($Request.Body.dattoSiteDetails)</td></tr>
+</table>
+<br />
+</td></tr></table>
+
 $AlertDetailsMatch
-<div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3;">
-<p><strong>Note:</strong> Content optimized from $($OriginalHtml.Length) characters. Check Datto RMM for complete details.</p>
-</div></div></body></html>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#222222; margin-top: 15px;">
+<tr><td style="padding: 15px; font-family: sans-serif; font-size: 14px; color: #ffffff;">
+<p style="color: #ffffff; margin: 0;"><strong>Note:</strong> Content optimized from $($OriginalHtml.Length) characters. Check Datto RMM for complete details.</p>
+</td></tr></table>
+
+</td></tr></tbody></table></td></tr></tbody></table></body></html>
 "@
         
         # Final safety check - if still too large, create ultra-minimal version
         if ($StreamlinedHTMLBody.Length -gt $SafeMaxLength) {
             Write-Host "Creating ultra-minimal version to ensure compliance with 3MB limit..."
             $MinimalHTMLBody = @"
-<div style="font-family: sans-serif; color: #333; padding: 20px; max-width: 600px;">
-<h2 style="color: #d32f2f;">$AlertPriority Alert - $DeviceHostname</h2>
-<table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Alert UID:</td><td style="padding: 8px;">$($Request.Body.alertUID)</td></tr>
-<tr><td style="padding: 8px; font-weight: bold;">Device:</td><td style="padding: 8px;">$DeviceHostname</td></tr>
-<tr style="background: #f5f5f5;"><td style="padding: 8px; font-weight: bold;">Priority:</td><td style="padding: 8px;">$AlertPriority</td></tr>
-<tr><td style="padding: 8px; font-weight: bold;">Site:</td><td style="padding: 8px;">$($Request.Body.dattoSiteDetails)</td></tr>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 100%;" bgcolor="#333333" width="100%">
+<tbody><tr><td style="width: 100%; margin: 0; padding: 16px;" align="left" bgcolor="#333333" width="100%">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#222222;">
+<tr><td style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #ffffff;">
+<h1 style="margin: 0 0 10px; font-size: 25px; line-height: 30px; font-weight: normal; $PriorityStyle">
+$AlertPriority Alert - $DeviceHostname
+</h1>
+<table style="width: 100%; border-collapse: collapse; margin: 15px 0; color: #ffffff;">
+<tr style="background-color: #333333;"><td style="padding: 8px; font-weight: bold; color: #ffffff;">Alert UID:</td><td style="padding: 8px; color: #ffffff;">$($Request.Body.alertUID)</td></tr>
+<tr><td style="padding: 8px; font-weight: bold; color: #ffffff;">Device:</td><td style="padding: 8px; color: #ffffff;">$DeviceHostname</td></tr>
+<tr style="background-color: #333333;"><td style="padding: 8px; font-weight: bold; color: #ffffff;">Priority:</td><td style="padding: 8px; color: #ffffff;">$AlertPriority</td></tr>
+<tr><td style="padding: 8px; font-weight: bold; color: #ffffff;">Site:</td><td style="padding: 8px; color: #ffffff;">$($Request.Body.dattoSiteDetails)</td></tr>
 </table>
-<p style="background: #fff3e0; padding: 10px; border-left: 3px solid #ff9800; margin: 15px 0;">
-<strong>Note:</strong> Alert content minimized from $($OriginalHtml.Length) characters to comply with size limits. Check Datto RMM for complete details.
-</p></div>
+<p style="background-color: #333333; padding: 10px; border-left: 3px solid #ff9800; margin: 15px 0; color: #ffffff;">
+<strong style="color: #ffffff;">Note:</strong> Alert content minimized from $($OriginalHtml.Length) characters to comply with size limits. Check Datto RMM for complete details.
+</p>
+</td></tr></table></td></tr></tbody></table>
 "@
             return $MinimalHTMLBody
         }
