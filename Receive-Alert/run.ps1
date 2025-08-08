@@ -4,21 +4,37 @@ using namespace Microsoft.Azure.Cosmos.Table
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
 
+# Set up error handling
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
 # Start performance tracking
 $startTime = Get-Date
-Write-Host "Processing Webhook for Alert with the UID of - $($Request.Body.alertUID) -"
+$alertUID = $Request.Body.alertUID
 
-#Respond Request Ok
-Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-        StatusCode = [HttpStatusCode]::Accepted
-        Body       = 'Request accepted. Processing in the background.'
-    })
+try {
+    Write-Host "Processing Webhook for Alert with the UID of - $alertUID -"
 
-#Halo Vars
-$HaloClientID = $env:HaloClientID
-$HaloClientSecret = $env:HaloClientSecret
-$HaloURL = $env:HaloURL
-$HaloTicketStatusID = $env:HaloTicketStatusID
+    # Validate incoming request
+    if (-not $Request -or -not $Request.Body) {
+        throw "Invalid request: Missing request body"
+    }
+
+    if (-not $alertUID) {
+        throw "Invalid request: Missing alertUID in request body"
+    }
+
+    #Respond Request Ok
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::Accepted
+            Body       = 'Request accepted. Processing in the background.'
+        })
+
+    #Halo Vars with validation
+    $HaloClientID = $env:HaloClientID
+    $HaloClientSecret = $env:HaloClientSecret
+    $HaloURL = $env:HaloURL
+    $HaloTicketStatusID = $env:HaloTicketStatusID
 $HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
 $HaloTicketType = $env:HaloTicketType
 $HaloReocurringStatus = $env:HaloReocurringStatus
@@ -324,18 +340,18 @@ if ($Email) {
             # Handle Specific Ticket responses based on ticket subject type
             # Check if the alert message contains the specific disk usage alert for the C: drive
             if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
-                Handle-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
+                Invoke-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
             } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
-                Handle-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
             } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
-                Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
-                #Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
+                #Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
             } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
-                Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
             } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
-                Handle-HostsAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-HostsAlert -HaloTicketCreate $HaloTicketCreate
             } else {
-                Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
             }
         }
     }
@@ -351,4 +367,35 @@ if ($Email) {
         $endTime = Get-Date
         $totalDuration = New-TimeSpan -Start $startTime -End $endTime
         Write-Host "Total processing time (no alert): $($totalDuration.TotalSeconds) seconds"
+}
+}
+catch {
+    $endTime = Get-Date
+    $totalDuration = New-TimeSpan -Start $startTime -End $endTime
+    
+    $errorMessage = $_.Exception.Message
+    $errorLine = $_.InvocationInfo.ScriptLineNumber
+    $errorCommand = $_.InvocationInfo.MyCommand.Name
+    
+    Write-Error "CRITICAL ERROR processing alert $alertUID after $($totalDuration.TotalSeconds) seconds"
+    Write-Error "Error at line $errorLine in $errorCommand`: $errorMessage"
+    Write-Error "Full exception: $($_.Exception.ToString())"
+    
+    # Log structured error information for monitoring
+    $errorDetails = @{
+        AlertUID = $alertUID
+        Error = $errorMessage
+        Line = $errorLine
+        Command = $errorCommand
+        Duration = $totalDuration.TotalSeconds
+        Timestamp = $endTime.ToString('yyyy-MM-dd HH:mm:ss')
+    }
+    
+    Write-Host "ERROR_DETAILS: $($errorDetails | ConvertTo-Json -Compress)"
+    
+    # Return error response
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [HttpStatusCode]::InternalServerError
+        Body       = "Error processing alert: $errorMessage"
+    })
 }

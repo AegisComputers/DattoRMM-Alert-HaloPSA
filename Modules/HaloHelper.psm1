@@ -1,3 +1,6 @@
+# HaloHelper Module - HaloPSA API integration and report management
+Set-StrictMode -Version Latest
+
 function Invoke-HaloReport {
     param (
         $Report,
@@ -101,3 +104,10 @@ function Find-DattoAlertHaloClient {
         return $null
     }
 }
+
+# Export the public functions
+Export-ModuleMember -Function @(
+    'Invoke-HaloReport',
+    'Find-DattoAlertHaloSite',
+    'Find-DattoAlertHaloClient'
+)

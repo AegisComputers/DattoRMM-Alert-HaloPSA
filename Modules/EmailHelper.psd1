@@ -29,7 +29,7 @@ Description = 'This module, HaloHelper, provides enhanced email handling and res
 PowerShellVersion = '7.0'
 
 # Functions to export from this module.
-FunctionsToExport = @('Get-HaloUserEmail', 'Send-HaloEmailResponse', 'FindAndSendHaloResponse')
+FunctionsToExport = @('Get-HaloUserEmail', 'Send-HaloEmailResponse', 'Send-HaloUserResponse')
 
 # Variables to export from this module.
 VariablesToExport = '*'
@@ -41,7 +41,7 @@ AliasesToExport = @()
 NestedModules = @()
 
 # List of all files packaged with this module.
-FileList = @('HaloEmail.psm1')
+FileList = @('EmailHelper.psm1')
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess.
 PrivateData = @{

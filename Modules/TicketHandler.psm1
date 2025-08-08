@@ -1,74 +1,155 @@
-# TicketHandler.ps1
-# Set environment variables and local variables
-$storageAccountName = Get-AlertingConfig -Path "Storage.StorageAccountName" -DefaultValue "dattohaloalertsstgnirab"
-$storageAccountKey = $env:strKey
-$tableName = Get-AlertingConfig -Path "Storage.TableName" -DefaultValue "DevicePatchAlerts"
+# TicketHandler.psm1
+# Enhanced error handling and validation
 
-# Ensure the storage account key is set
-if (-not $storageAccountKey) {
-    Write-Error "Storage account key is not set. Please set the environment variable 'strKey'."
-    exit 1
+[CmdletBinding()]
+param()
+
+# Set strict mode for better error detection
+Set-StrictMode -Version Latest
+
+# Set up error handling preferences
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
+# Initialize module with validation
+try {
+    # Validate required environment variables
+    $requiredEnvVars = @(
+        'HaloClientID', 'HaloClientSecret', 'HaloURL', 'HaloTicketStatusID',
+        'HaloCustomAlertTypeField', 'HaloTicketType', 'DattoURL', 'DattoKey', 'DattoSecretKey'
+    )
+    
+    $missingVars = @()
+    foreach ($var in $requiredEnvVars) {
+        if (-not (Get-ChildItem Env:$var -ErrorAction SilentlyContinue)) {
+            $missingVars += $var
+        }
+    }
+    
+    if ($missingVars.Count -gt 0) {
+        Write-Warning "Missing required environment variables: $($missingVars -join ', ')"
+        Write-Warning "Some functions may not work correctly without these variables."
+    }
+    
+    # Set environment variables and local variables with validation
+    $storageAccountName = Get-AlertingConfig -Path "Storage.StorageAccountName" -DefaultValue "dattohaloalertsstgnirab"
+    $storageAccountKey = $env:strKey
+    $tableName = Get-AlertingConfig -Path "Storage.TableName" -DefaultValue "DevicePatchAlerts"
+
+    # Validate storage configuration
+    if (-not $storageAccountKey) {
+        Write-Error "Storage account key is not set. Please set the environment variable 'strKey'." -ErrorAction Stop
+    }
+
+    # Halo Vars with validation
+    $HaloClientID = $env:HaloClientID
+    $HaloClientSecret = $env:HaloClientSecret
+    $HaloURL = $env:HaloURL
+    $HaloTicketStatusID = $env:HaloTicketStatusID
+    $HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
+    $HaloTicketType = $env:HaloTicketType
+    $HaloReocurringStatus = $env:HaloReocurringStatus
+
+    # Datto Vars with validation
+    $DattoURL = $env:DattoURL
+    $DattoKey = $env:DattoKey
+    $DattoSecretKey = $env:DattoSecretKey
+    $DattoAlertUIDField = $env:DattoAlertUIDField
+
+    # Connect to Azure Storage with error handling
+    try {
+        $context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey -ErrorAction Stop
+        $table = Get-StorageTable -Context $context -TableName $tableName -ErrorAction Stop
+        Write-Verbose "Successfully connected to Azure Storage"
+    }
+    catch {
+        Write-Error "Failed to connect to Azure Storage: $($_.Exception.Message)" -ErrorAction Stop
+    }
 }
-
-#Halo Vars
-$HaloClientID = $env:HaloClientID
-$HaloClientSecret = $env:HaloClientSecret
-$HaloURL = $env:HaloURL
-$HaloTicketStatusID = $env:HaloTicketStatusID
-$HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
-$HaloTicketType = $env:HaloTicketType
-$HaloReocurringStatus = $env:HaloReocurringStatus
-
-#Datto Vars
-$DattoURL = $env:DattoURL
-$DattoKey = $env:DattoKey
-$DattoSecretKey = $env:DattoSecretKey
-$DattoAlertUIDField = $env:DattoAlertUIDField
-
-# Connect to Azure Storage
-$context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
-$table = Get-StorageTable -Context $context -TableName $tableName
+catch {
+    Write-Error "Failed to initialize TicketHandler module: $($_.Exception.Message)" -ErrorAction Stop
+}
 
 ## Global cache for online error lookups
 $global:OnlineErrorCache = @{}
 
 function New-HaloTicketWithFallback {
-    param ($HaloTicketCreate)
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        $HaloTicketCreate
+    )
 
-    try {
-        $Ticket = New-HaloTicket -Ticket $HaloTicketCreate
-        Write-Host "Ticket created successfully with ID: $($Ticket.id)"
-        return $Ticket
+    begin {
+        Write-Verbose "Starting ticket creation with fallback logic"
+        $retryCount = 0
+        $maxRetries = Get-AlertingConfig -Path "ErrorHandling.MaxRetryAttempts" -DefaultValue 3
+        $retryDelay = Get-AlertingConfig -Path "ErrorHandling.RetryDelaySeconds" -DefaultValue 2
     }
-    catch {
-        Write-Error "Failed to create Halo ticket: $($_.Exception.Message)"
-        
-        # If it's a timeout error, try with minimal details
-        if ($_.Exception.Message -like "*504*" -or $_.Exception.Message -like "*timeout*" -or $_.Exception.Message -like "*Gateway Time-out*") {
-            Write-Host "Attempting to create ticket with minimal details due to timeout..."
-            $HaloTicketCreateFallback = $HaloTicketCreate.Clone()
-            
-            # Create a very basic ticket with essential information only
-            $AlertUID = ($HaloTicketCreate.customfields | Where-Object { $_.id -eq $env:DattoAlertUIDField }).value
-            $TicketSummary = $HaloTicketCreate.summary
-            
-            # Use helper function to create minimal content
-            $MinimalContent = New-MinimalTicketContent -TicketSummary $TicketSummary -AlertUID $AlertUID
-            $HaloTicketCreateFallback.details_html = $MinimalContent
-            
+
+    process {
+        do {
             try {
-                $Ticket = New-HaloTicket -Ticket $HaloTicketCreateFallback
-                Write-Host "Fallback ticket created successfully with ID: $($Ticket.id)"
+                Write-Verbose "Attempting to create Halo ticket (attempt $($retryCount + 1))"
+                
+                # Validate ticket object structure
+                if (-not $HaloTicketCreate.summary) {
+                    throw "Ticket summary is required but missing"
+                }
+                
+                $Ticket = New-HaloTicket -Ticket $HaloTicketCreate -ErrorAction Stop
+                Write-Host "Ticket created successfully with ID: $($Ticket.id)"
                 return $Ticket
             }
             catch {
-                Write-Error "Failed to create fallback ticket: $($_.Exception.Message)"
-                throw
+                $retryCount++
+                $errorMessage = $_.Exception.Message
+                Write-Warning "Failed to create Halo ticket (attempt $retryCount): $errorMessage"
+                
+                # Check if it's a timeout error for fallback logic
+                if ($errorMessage -like "*504*" -or $errorMessage -like "*timeout*" -or $errorMessage -like "*Gateway Time-out*") {
+                    Write-Host "Attempting to create ticket with minimal details due to timeout..."
+                    
+                    try {
+                        $HaloTicketCreateFallback = $HaloTicketCreate.PSObject.Copy()
+                        
+                        # Create a very basic ticket with essential information only
+                        $AlertUID = ($HaloTicketCreate.customfields | Where-Object { $_.id -eq $env:DattoAlertUIDField }).value
+                        $TicketSummary = $HaloTicketCreate.summary
+                        
+                        # Use helper function to create minimal content
+                        $MinimalContent = New-MinimalTicketContent -TicketSummary $TicketSummary -AlertUID $AlertUID
+                        $HaloTicketCreateFallback.details_html = $MinimalContent
+                        
+                        $Ticket = New-HaloTicket -Ticket $HaloTicketCreateFallback -ErrorAction Stop
+                        Write-Host "Fallback ticket created successfully with ID: $($Ticket.id)"
+                        return $Ticket
+                    }
+                    catch {
+                        Write-Error "Failed to create fallback ticket: $($_.Exception.Message)"
+                        if ($retryCount -ge $maxRetries) {
+                            throw
+                        }
+                    }
+                }
+                else {
+                    # For non-timeout errors, check if we should retry
+                    if ($retryCount -ge $maxRetries) {
+                        Write-Error "Maximum retry attempts ($maxRetries) reached. Giving up."
+                        throw
+                    }
+                }
+                
+                if ($retryCount -lt $maxRetries) {
+                    Write-Host "Waiting $retryDelay seconds before retry..."
+                    Start-Sleep -Seconds $retryDelay
+                }
             }
-        }
-        else {
-            throw
-        }
+        } while ($retryCount -lt $maxRetries)
+        
+        # If we get here, all retries failed
+        throw "Failed to create ticket after $maxRetries attempts"
     }
 }
 
@@ -203,7 +284,7 @@ function Get-OnlineErrorMessage {
     return $onlineMessage
 }
 
-function Handle-DiskUsageAlert {
+function Invoke-DiskUsageAlert {
     param (
         $Request,
         $HaloTicketCreate,
@@ -222,7 +303,7 @@ function Handle-DiskUsageAlert {
     $Ticket = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 
     try {
-        FindAndSendHaloResponse -Username $Username `
+        Send-HaloUserResponse -Username $Username `
             -ClientID $HaloClientDattoMatch `
             -TicketId $Ticket.id `
             -EmailMessage (Get-AlertingConfig -Path "CustomerNotifications.DiskUsage.EmailTemplate" -DefaultValue "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>") `
@@ -233,7 +314,7 @@ function Handle-DiskUsageAlert {
     }
 }
 
-function Handle-HyperVReplicationAlert {
+function Invoke-HyperVReplicationAlert {
     param ($HaloTicketCreate)
 
     Write-Host "Alert detected for Hyper-V Replication. Taking action..."
@@ -284,7 +365,7 @@ function Handle-HyperVReplicationAlert {
     }
 }
 
-function Handle-PatchMonitorAlert {
+function Invoke-PatchMonitorAlert {
     param (
         $AlertWebhook,
         $HaloTicketCreate,
@@ -311,17 +392,17 @@ function Handle-PatchMonitorAlert {
         
         # Use try-catch to handle potential race conditions in storage operations
         try {
-            $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
+            $entity = Get-StorageEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
 
             if ($null -eq $entity) {
                 # Create a new entity with an initial AlertCount of 1.
                 # Use InsertOrMerge to handle race conditions where entity might be created by another process
                 $entity = [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]::new($partitionKey, $rowKey)
                 $entity.Properties.Add("AlertCount", [Microsoft.Azure.Cosmos.Table.EntityProperty]::GeneratePropertyForInt(1))
-                $null = InsertOrMergeEntity -table $table -entity $entity
+                $null = Add-StorageEntity -table $table -entity $entity
                 
                 # Re-fetch the entity to get current state after potential merge
-                $entity = GetEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
+                $entity = Get-StorageEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
             } else {
                 # Increment the alert count and update the entity.
                 $entity.AlertCount++
@@ -353,7 +434,7 @@ function Handle-PatchMonitorAlert {
     }
 }
 
-function Handle-BackupExecAlert {
+function Invoke-BackupExecAlert {
     param ($HaloTicketCreate)
 
     Write-Host "Backup Exec Alert Detected"
@@ -361,7 +442,7 @@ function Handle-BackupExecAlert {
     $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
 
-function Handle-HostsAlert {
+function Invoke-HostsAlert {
     param ($HaloTicketCreate)
 
     Write-Host "Hosts Alert Detected"
@@ -629,7 +710,7 @@ function Test-AlertConsolidation {
     }
 }
 
-function Handle-DefaultAlert {
+function Invoke-DefaultAlert {
     param ($HaloTicketCreate)
 
     Write-Host "Creating Ticket without additional processing!"
@@ -643,12 +724,12 @@ Export-ModuleMember -Function @(
     'Get-WindowsErrorMessage',
     'Get-CustomErrorMessage',
     'Get-OnlineErrorMessage',
-    'Handle-DiskUsageAlert',
-    'Handle-HyperVReplicationAlert',
-    'Handle-PatchMonitorAlert',
-    'Handle-BackupExecAlert',
-    'Handle-HostsAlert',
-    'Handle-DefaultAlert',
+    'Invoke-DiskUsageAlert',
+    'Invoke-HyperVReplicationAlert',
+    'Invoke-PatchMonitorAlert',
+    'Invoke-BackupExecAlert',
+    'Invoke-HostsAlert',
+    'Invoke-DefaultAlert',
     'Find-ExistingSecurityAlert',
     'Update-ExistingSecurityTicket',
     'Test-AlertConsolidation'

@@ -13,6 +13,8 @@ Oliver Perring - Aegis Computer Maintenance Ltd
 1.0.0
 #>
 
+Set-StrictMode -Version Latest
+
 # Global variable to store the loaded configuration
 $script:LoadedConfig = $null
 $script:ConfigPath = $null
