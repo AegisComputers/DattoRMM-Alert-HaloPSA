@@ -125,37 +125,6 @@ if ($Email) {
         Write-Host "Created new Alerts Report with ID: $($HaloAlertsReportBase.id)"
     }
 
-    # $HaloAlertsReport = Invoke-HaloReport -Report $HaloAlertsReportBase
-
-    # Alert report filtering for potential future correlation logic
-    # $AlertReportFilter = @{
-    #     id                       = $HaloAlertsReport.id
-    #     filters                  = @(
-    #         @{
-    #             fieldname      = 'inventorynumber'
-    #             stringruletype = 2
-    #             stringruletext = "$($HaloDevice.did)"
-    #         }
-    #     )
-    #     _loadreportonly          = $true
-    #     reportingperiodstartdate = get-date(((Get-date).ToUniversalTime()).adddays(-$HaloAlertHistoryDays)) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
-    #     reportingperiodenddate   = get-date((Get-date -Hour 23 -Minute 59 -second 59).ToUniversalTime()) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
-    #     reportingperioddatefield = "dateoccured"
-    #     reportingperiod          = "7"
-    # }
-
-    # Retrieve the report rows from a Halo report based on the given alert report filter
-    # $ReportResults = (Set-HaloReport -Report $AlertReportFilter).report.rows
-
-    # Filter the report results to find any history of recurring alerts that match the specific alert type
-    # $ReoccuringHistory = $ReportResults | where-object { $_.CFDattoAlertType -eq $ParsedAlertType } 
-    
-    # Further filter the recurring alerts to find those that occurred within the specified time frame
-    # $ReoccuringAlerts = $ReoccuringHistory | where-object { $_.dateoccured -gt ((Get-Date).addhours(-$ReoccurringTicketHours)) }
-
-    # Find related alerts that occurred within a different specified time frame and are of a different alert type
-    # $RelatedAlerts = $ReportResults | where-object { $_.dateoccured -gt ((Get-Date).addminutes(-$RelatedAlertMinutes)).ToUniversalTime() -and $_.CFDattoAlertType -ne $ParsedAlertType }
-    
     # Capture the subject of the email alert
     $TicketSubject = $Email.Subject
 
