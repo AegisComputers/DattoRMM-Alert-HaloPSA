@@ -539,29 +539,7 @@ function Update-ExistingSecurityTicket {
         # Add the note to the ticket
         $actionResult = New-HaloAction -Action $actionToAdd
         
-        if ($actionResult) {
-            Write-Host "Successfully added consolidation note to ticket $($ExistingTicket.id)"
-            
-            # Update ticket to ensure it's marked as responded to
-            $ticketUpdate = @{
-                id = $ExistingTicket.id
-                status_id = $ExistingTicket.status_id
-                agent_id = 38
-            }
-            
-            try {
-                Set-HaloTicket -Ticket $ticketUpdate
-                Write-Host "Updated ticket response timestamp"
-            }
-            catch {
-                Write-Warning "Failed to update ticket response timestamp: $($_.Exception.Message)"
-            }
-            
-            return $true
-        } else {
-            Write-Error "Failed to add note to ticket $($ExistingTicket.id)"
-            return $false
-        }
+        
     }
     catch {
         Write-Error "Error updating existing ticket: $($_.Exception.Message)"
