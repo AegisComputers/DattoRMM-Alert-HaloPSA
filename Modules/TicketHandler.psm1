@@ -539,7 +539,13 @@ function Update-ExistingSecurityTicket {
         # Add the note to the ticket
         $actionResult = New-HaloAction -Action $actionToAdd
         
-        
+        if ($actionResult) {
+            Write-Host "Successfully updated ticket $($ExistingTicket.id) with new alert details."
+            return $true
+        } else {
+            Write-Warning "Failed to update ticket $($ExistingTicket.id)."
+            return $false
+        }
     }
     catch {
         Write-Error "Error updating existing ticket: $($_.Exception.Message)"
