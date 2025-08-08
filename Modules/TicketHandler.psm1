@@ -425,8 +425,9 @@ function Find-ExistingSecurityAlert {
         
         Write-Host "Searching for existing tickets matching pattern: $searchPattern"
         
-        # Search for tickets using Halo API with -OpenOnly (so all results are already open)
-        $searchResults = Get-HaloTicket -Search "Device: $DeviceName" -OpenOnly -FullObjects
+        # Search for tickets using Halo API with -SearchSummary and -OpenOnly (so all results are already open)
+        # Using -SearchSummary instead of -Search to work around API bug with device names ending in numbers
+        $searchResults = Get-HaloTicket -SearchSummary "Device: $DeviceName" -OpenOnly -FullObjects
         
         Write-Host "Search returned $($searchResults.Count) open tickets for device: $DeviceName"
         
