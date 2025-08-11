@@ -606,14 +606,18 @@ function Update-ExistingSecurityTicket {
         $noteTemplate = Get-AlertingConfig -Path "AlertConsolidation.ConsolidationNoteTemplate" -DefaultValue "Additional {AlertType} alert detected at {Timestamp}. Total occurrences: {Count}"
         
         # Check if we've reached max consolidation limit
-        $currentNotes = Get-HaloTicket -TicketID $ExistingTicket.id -IncludeDetails
+        # Get ticket actions separately using Get-HaloAction
+        $ticketActions = @()
+        try {
+            $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id
+        } catch {
+            Write-Warning "Failed to get actions for ticket $($ExistingTicket.id): $($_.Exception.Message)"
+        }
         
-        # Safely access actions property
+        # Find consolidation notes
         $consolidationNotes = @()
-        if ($currentNotes -and $currentNotes.PSObject.Properties.Name -contains 'actions' -and $currentNotes.actions) {
-            $consolidationNotes = $currentNotes.actions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" }
-        } else {
-            Write-Warning "Ticket $($ExistingTicket.id) has no actions property or actions is null. Proceeding with count of 0."
+        if ($ticketActions) {
+            $consolidationNotes = $ticketActions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" }
         }
         $currentCount = $consolidationNotes.Count + 1 # +1 for the original ticket
         
@@ -967,9 +971,14 @@ function Update-ExistingMemoryUsageTicket {
         
         # Count existing occurrences in the ticket actions/notes
         $occurrenceCount = 1
-        if ($ExistingTicket.actions) {
-            $memoryUsageNotes = $ExistingTicket.actions | Where-Object { $_.note -like "*Memory Usage alert*" -or $_.note -like "*memory usage*" }
-            $occurrenceCount = $memoryUsageNotes.Count + 1
+        try {
+            $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id
+            if ($ticketActions) {
+                $memoryUsageNotes = $ticketActions | Where-Object { $_.note -like "*Memory Usage alert*" -or $_.note -like "*memory usage*" }
+                $occurrenceCount = $memoryUsageNotes.Count + 1
+            }
+        } catch {
+            Write-Warning "Failed to get actions for memory consolidation ticket $($ExistingTicket.id): $($_.Exception.Message)"
         }
         
         # Check if we've hit the max consolidation limit
