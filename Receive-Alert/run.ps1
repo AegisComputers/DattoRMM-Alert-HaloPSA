@@ -299,7 +299,18 @@ if ($Email) {
     } else {
         # Check for alert consolidation before creating new tickets
         Write-Host "Checking if alert should be consolidated with existing ticket..."
-        $wasConsolidated = Test-AlertConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+        
+        # First check for memory usage alerts
+        $wasConsolidated = $false
+        if ($TicketSubject -like "*Memory Usage reached*") {
+            Write-Host "Detected memory usage alert, checking for memory usage consolidation..."
+            $wasConsolidated = Test-MemoryUsageConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+        }
+        
+        # If not a memory usage alert or memory consolidation failed, try general consolidation
+        if (-not $wasConsolidated) {
+            $wasConsolidated = Test-AlertConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+        }
         
         if ($wasConsolidated) {
             Write-Host "Alert was successfully consolidated with existing ticket. No new ticket created."

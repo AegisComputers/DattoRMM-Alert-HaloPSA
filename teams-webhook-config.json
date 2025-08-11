@@ -1,0 +1,37 @@
+{
+  "AlertConsolidation": {
+    "EnableConsolidation": true,
+    "ConsolidatableAlertTypes": [
+      "Security",
+      "Event Log", 
+      "Memory Usage",
+      "Memory",
+      "Disk Usage"
+    ],
+    "MaxConsolidationCount": 50,
+    "ConsolidationWindowHours": 24,
+    "TeamsNotificationThreshold": 3,
+    "MemoryUsageNoteTemplate": "Additional Memory Usage alert: Device {DeviceName} reached {MemoryPercentage}% at {Timestamp}. Current occurrence count: {Count}"
+  },
+  "TeamsNotifications": {
+    "WebhookUrl": "https://default2345c4f24d2a4b47a228dc64d28cf1.7e.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/05ade4788ca842c7a5cb380ddc46b446/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Z1w5yLkMy0NCvmofz36CXtdX4SiB8FPV61mbXHzvXj4",
+    "EnableNotifications": true,
+    "NotificationThresholds": {
+      "MemoryUsage": {
+        "MinOccurrenceCount": 3,
+        "HighSeverityPercentage": 95,
+        "MediumSeverityPercentage": 85
+      }
+    }
+  },
+  "TicketDefaults": {
+    "TicketTypeId": 8,
+    "Category1": "Datto Alert"
+  },
+  "AlertThresholds": {
+    "HtmlBodyMaxLength": 3000000,
+    "RelatedAlertWindowMinutes": 5,
+    "ReoccurringTicketHours": 24,
+    "HaloAlertHistoryDays": 30
+  }
+}

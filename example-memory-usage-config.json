@@ -1,0 +1,25 @@
+{
+  "AlertConsolidation": {
+    "EnableConsolidation": true,
+    "ConsolidatableAlertTypes": [
+      "Security",
+      "Event Log",
+      "Memory Usage",
+      "Memory",
+      "Disk Usage"
+    ],
+    "MaxConsolidationCount": 50,
+    "ConsolidationWindowHours": 24,
+    "MemoryUsageNoteTemplate": "Additional Memory Usage alert: Device {DeviceName} reached {MemoryPercentage}% at {Timestamp}. Current occurrence count: {Count}"
+  },
+  "TicketDefaults": {
+    "TicketTypeId": 8,
+    "Category1": "Datto Alert"
+  },
+  "AlertThresholds": {
+    "HtmlBodyMaxLength": 3000000,
+    "RelatedAlertWindowMinutes": 5,
+    "ReoccurringTicketHours": 24,
+    "HaloAlertHistoryDays": 30
+  }
+}

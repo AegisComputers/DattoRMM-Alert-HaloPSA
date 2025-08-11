@@ -591,6 +591,18 @@ function Update-ExistingSecurityTicket {
             return $false
         }
         
+        # Check if we should send a Teams notification for high consolidation count
+        $teamsNotificationThreshold = Get-AlertingConfig -Path "AlertConsolidation.TeamsNotificationThreshold" -DefaultValue 3
+        if (($currentCount + 1) -ge $teamsNotificationThreshold) {
+            # Extract device name from ticket summary for Teams notification
+            $deviceName = "Unknown Device"
+            if ($ExistingTicket.summary -match "Device:\s*([^\s]+)\s+raised Alert") {
+                $deviceName = $matches[1]
+            }
+            
+            Send-AlertConsolidationTeamsNotification -DeviceName $deviceName -AlertType $AlertType -AlertDetails $AlertType -OccurrenceCount ($currentCount + 1) -TicketId $ExistingTicket.id -AlertWebhook $NewAlertDetails
+        }
+        
         # Create consolidation note
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         $consolidationNote = $noteTemplate -replace "\{AlertType\}", $AlertType -replace "\{Timestamp\}", $timestamp -replace "\{Count\}", ($currentCount + 1)
@@ -717,6 +729,757 @@ function Invoke-DefaultAlert {
     $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
 }
 
+function Find-ExistingMemoryUsageAlert {
+    <#
+    .SYNOPSIS
+    Searches for existing memory usage tickets for the same device to enable consolidation.
+    
+    .PARAMETER DeviceName
+    The name of the device from the alert
+    
+    .PARAMETER MemoryPercentage
+    The memory usage percentage from the alert
+    
+    .RETURNS
+    Existing ticket object if found, null if not found
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [int]$MemoryPercentage
+    )
+    
+    # Check if consolidation is enabled
+    $consolidationEnabled = Get-AlertingConfig -Path "AlertConsolidation.EnableConsolidation" -DefaultValue $false
+    if (-not $consolidationEnabled) {
+        Write-Debug "Alert consolidation is disabled"
+        return $null
+    }
+    
+    # Check if memory usage alerts should be consolidated
+    $consolidatableTypes = Get-AlertingConfig -Path "AlertConsolidation.ConsolidatableAlertTypes" -DefaultValue @()
+    $shouldConsolidate = $false
+    foreach ($type in $consolidatableTypes) {
+        if ("Memory Usage" -like "*$type*" -or $type -like "*Memory*" -or $type -like "*memory*") {
+            $shouldConsolidate = $true
+            break
+        }
+    }
+    
+    if (-not $shouldConsolidate) {
+        Write-Debug "Memory Usage alerts are not configured for consolidation"
+        return $null
+    }
+    
+    try {
+        Write-Host "Searching for existing memory usage tickets for device: $DeviceName"
+        
+        # Search for tickets with memory usage pattern for this device
+        $searchResults = Get-HaloTicket -SearchSummary "Device: $DeviceName" -OpenOnly -FullObjects
+        
+        Write-Host "Search returned $($searchResults.Count) open tickets for device: $DeviceName"
+        
+        if ($searchResults -and $searchResults.Count -gt 0) {
+            $matchingTickets = @()
+            
+            foreach ($ticket in $searchResults) {
+                # Check if ticket summary contains memory usage pattern
+                # Looking for: "Device: GUILWKS0062 raised Alert: - Memory Usage reached XX%"
+                if ($ticket.summary -match "Device:\s*$([regex]::Escape($DeviceName))\s+raised Alert:\s*-?\s*Memory Usage reached \d+%") {
+                    Write-Host "Found potential memory usage consolidation ticket: ID $($ticket.id) - $($ticket.summary)"
+                    $matchingTickets += $ticket
+                }
+            }
+            
+            if ($matchingTickets.Count -gt 0) {
+                # Return the most recent ticket for consolidation
+                return $matchingTickets | Sort-Object date_created -Descending | Select-Object -First 1
+            }
+        }
+        
+        Write-Host "No existing memory usage tickets found for device: $DeviceName"
+        return $null
+    }
+    catch {
+        Write-Error "Error searching for existing memory usage alerts: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+function Test-MemoryUsageConsolidation {
+    <#
+    .SYNOPSIS
+    Tests if a memory usage alert should be consolidated with an existing ticket.
+    
+    .PARAMETER HaloTicketCreate
+    The ticket object that would be created
+    
+    .PARAMETER AlertWebhook
+    The webhook data from the alert
+    
+    .RETURNS
+    True if alert was consolidated, false if new ticket should be created
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [PSObject]$HaloTicketCreate,
+        [Parameter(Mandatory)]
+        [PSObject]$AlertWebhook
+    )
+    
+    try {
+        # Check if this is a memory usage alert
+        # Expected format: "Device: GUILWKS0062 raised Alert: - Memory Usage reached 99%"
+        if ($HaloTicketCreate.summary -notmatch "Memory Usage reached (\d+)%") {
+            Write-Debug "Not a memory usage alert, skipping memory usage consolidation"
+            return $false
+        }
+        
+        # Extract device name and memory percentage
+        $deviceName = ""
+        $memoryPercentage = 0
+        
+        if ($HaloTicketCreate.summary -match "Device:\s*([^\s]+)\s+raised Alert") {
+            $deviceName = $matches[1]
+        } else {
+            Write-Host "Could not extract device name from memory usage alert: $($HaloTicketCreate.summary)"
+            return $false
+        }
+        
+        if ($HaloTicketCreate.summary -match "Memory Usage reached (\d+)%") {
+            $memoryPercentage = [int]$matches[1]
+        } else {
+            Write-Host "Could not extract memory percentage from alert: $($HaloTicketCreate.summary)"
+            return $false
+        }
+        
+        Write-Host "Testing memory usage consolidation for device '$deviceName' at $memoryPercentage% usage"
+        
+        # Search for existing memory usage ticket
+        $existingTicket = Find-ExistingMemoryUsageAlert -DeviceName $deviceName -MemoryPercentage $memoryPercentage
+        
+        if ($existingTicket) {
+            Write-Host "Found existing memory usage ticket for consolidation: $($existingTicket.id)"
+            
+            # Update the existing ticket with new memory usage data
+            $updateResult = Update-ExistingMemoryUsageTicket -ExistingTicket $existingTicket -DeviceName $deviceName -MemoryPercentage $memoryPercentage -AlertWebhook $AlertWebhook
+            
+            if ($updateResult) {
+                Write-Host "Successfully consolidated memory usage alert into existing ticket $($existingTicket.id)"
+                return $true
+            } else {
+                Write-Warning "Failed to consolidate memory usage alert. Will create new ticket."
+                return $false
+            }
+        } else {
+            Write-Host "No existing memory usage ticket found for consolidation. Will create new ticket."
+            return $false
+        }
+    }
+    catch {
+        Write-Error "Error in memory usage consolidation test: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Update-ExistingMemoryUsageTicket {
+    <#
+    .SYNOPSIS
+    Updates an existing memory usage ticket with new memory usage data.
+    
+    .PARAMETER ExistingTicket
+    The existing ticket to update
+    
+    .PARAMETER DeviceName
+    The device name from the alert
+    
+    .PARAMETER MemoryPercentage
+    The current memory usage percentage
+    
+    .PARAMETER AlertWebhook
+    The webhook data from the alert
+    
+    .RETURNS
+    True if update successful, false otherwise
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [PSObject]$ExistingTicket,
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [int]$MemoryPercentage,
+        [Parameter(Mandatory)]
+        [PSObject]$AlertWebhook
+    )
+    
+    try {
+        # Get configuration for consolidation
+        $maxCount = Get-AlertingConfig -Path "AlertConsolidation.MaxConsolidationCount" -DefaultValue 50
+        $noteTemplate = Get-AlertingConfig -Path "AlertConsolidation.MemoryUsageNoteTemplate" -DefaultValue "Additional Memory Usage alert: Device {DeviceName} reached {MemoryPercentage}% at {Timestamp}. Current occurrence count: {Count}"
+        
+        # Count existing occurrences in the ticket actions/notes
+        $occurrenceCount = 1
+        if ($ExistingTicket.actions) {
+            $memoryUsageNotes = $ExistingTicket.actions | Where-Object { $_.note -like "*Memory Usage alert*" -or $_.note -like "*memory usage*" }
+            $occurrenceCount = $memoryUsageNotes.Count + 1
+        }
+        
+        # Check if we've hit the max consolidation limit
+        if ($occurrenceCount -gt $maxCount) {
+            Write-Warning "Memory usage consolidation limit ($maxCount) reached for ticket $($ExistingTicket.id). Creating new ticket."
+            return $false
+        }
+        
+        # Check if we should send a Teams notification for high consolidation count
+        $teamsNotificationThreshold = Get-AlertingConfig -Path "AlertConsolidation.TeamsNotificationThreshold" -DefaultValue 3
+        if ($occurrenceCount -ge $teamsNotificationThreshold) {
+            Send-MemoryUsageTeamsNotification -DeviceName $DeviceName -MemoryPercentage $MemoryPercentage -OccurrenceCount $occurrenceCount -TicketId $ExistingTicket.id -AlertWebhook $AlertWebhook
+        }
+        
+        # Update the ticket summary to reflect latest memory usage
+        $updatedSummary = "Device: $DeviceName raised Alert: - Memory Usage reached $MemoryPercentage% (Alert #$occurrenceCount)"
+        
+        # Create the consolidation note
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $consolidationNote = $noteTemplate -replace "{DeviceName}", $DeviceName `
+                                          -replace "{MemoryPercentage}", $MemoryPercentage `
+                                          -replace "{Timestamp}", $timestamp `
+                                          -replace "{Count}", $occurrenceCount
+        
+        # Prepare ticket update
+        $ticketUpdate = @{
+            id = $ExistingTicket.id
+            summary = $updatedSummary
+        }
+        
+        Write-Host "Updating memory usage ticket $($ExistingTicket.id) with: $consolidationNote"
+        
+        # Update the ticket
+        $updateResult = Set-HaloTicket -Ticket $ticketUpdate
+        
+        if ($updateResult) {
+            # Add the consolidation note
+            $action = @{
+                ticket_id = $ExistingTicket.id
+                note = $consolidationNote
+                note_html = "<p><strong>Memory Usage Alert Consolidation:</strong><br>$consolidationNote</p>"
+                actiontypeid = 1  # Note action type
+                sendemail = $false
+            }
+            
+            $actionResult = New-HaloAction -Action $action
+            
+            if ($actionResult) {
+                Write-Host "Successfully updated memory usage ticket $($ExistingTicket.id) with consolidation data"
+                return $true
+            } else {
+                Write-Warning "Updated ticket but failed to add consolidation note"
+                return $true  # Still consider it successful since ticket was updated
+            }
+        } else {
+            Write-Error "Failed to update memory usage ticket $($ExistingTicket.id)"
+            return $false
+        }
+    }
+    catch {
+        Write-Error "Error updating existing memory usage ticket: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Send-AlertConsolidationTeamsNotification {
+    <#
+    .SYNOPSIS
+    Sends a Microsoft Teams notification when alerts are consolidated multiple times.
+    
+    .PARAMETER DeviceName
+    The device name experiencing the issue
+    
+    .PARAMETER AlertType
+    The type of alert (e.g., "Security", "Memory Usage", "Disk Usage")
+    
+    .PARAMETER AlertDetails
+    Additional details about the alert (e.g., memory percentage, security event)
+    
+    .PARAMETER OccurrenceCount
+    The number of times this alert has been consolidated
+    
+    .PARAMETER TicketId
+    The HaloPSA ticket ID
+    
+    .PARAMETER AlertWebhook
+    The original alert webhook data
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [string]$AlertType,
+        [Parameter(Mandatory)]
+        [string]$AlertDetails,
+        [Parameter(Mandatory)]
+        [int]$OccurrenceCount,
+        [Parameter(Mandatory)]
+        [int]$TicketId,
+        [Parameter(Mandatory)]
+        [PSObject]$AlertWebhook
+    )
+    
+    try {
+        # Get Teams webhook URL from configuration
+        $teamsWebhookUrl = Get-AlertingConfig -Path "TeamsNotifications.WebhookUrl" -DefaultValue $null
+        
+        if (-not $teamsWebhookUrl) {
+            Write-Warning "Teams webhook URL not configured. Skipping Teams notification."
+            return
+        }
+        
+        # Determine severity and color based on alert type and occurrence count
+        $severity = "Medium"
+        $color = "warning" # Orange
+        $icon = "⚠️"
+        
+        # Set severity based on alert type and occurrence count
+        switch ($AlertType.ToLower()) {
+            "security" {
+                $icon = "🔒"
+                if ($OccurrenceCount -ge 5) {
+                    $severity = "Critical"
+                    $color = "attention" # Red
+                } elseif ($OccurrenceCount -ge 3) {
+                    $severity = "High"
+                    $color = "attention"
+                } else {
+                    $severity = "Medium"
+                    $color = "warning"
+                }
+            }
+            "memory usage" {
+                $icon = "🧠"
+                # Check if memory percentage is in alert details
+                if ($AlertDetails -match "(\d+)%") {
+                    $memoryPercentage = [int]$matches[1]
+                    if ($memoryPercentage -ge 95 -or $OccurrenceCount -ge 5) {
+                        $severity = "Critical"
+                        $color = "attention"
+                    } elseif ($memoryPercentage -ge 85 -and $OccurrenceCount -ge 3) {
+                        $severity = "High"
+                        $color = "attention"
+                    }
+                }
+            }
+            "disk usage" {
+                $icon = "💾"
+                if ($OccurrenceCount -ge 5) {
+                    $severity = "High"
+                    $color = "attention"
+                } elseif ($OccurrenceCount -ge 3) {
+                    $severity = "Medium"
+                    $color = "warning"
+                }
+            }
+            "event log" {
+                $icon = "📋"
+                if ($OccurrenceCount -ge 10) {
+                    $severity = "High"
+                    $color = "attention"
+                } elseif ($OccurrenceCount -ge 5) {
+                    $severity = "Medium"
+                    $color = "warning"
+                }
+            }
+            default {
+                $icon = "🚨"
+                if ($OccurrenceCount -ge 5) {
+                    $severity = "High"
+                    $color = "attention"
+                } elseif ($OccurrenceCount -ge 3) {
+                    $severity = "Medium"
+                    $color = "warning"
+                }
+            }
+        }
+        
+        # Get additional context
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+        $clientInfo = "Unknown Client"
+        $siteInfo = "Unknown Site"
+        
+        # Try to extract client/site info from webhook data
+        if ($AlertWebhook.dattoSiteDetails) {
+            $siteDetails = $AlertWebhook.dattoSiteDetails
+            if ($siteDetails -match "(.+)\((.+)\)") {
+                $siteInfo = $matches[1].Trim()
+                $clientInfo = $matches[2].Trim()
+            } else {
+                $siteInfo = $siteDetails
+            }
+        }
+        
+        # Create the Teams message payload using Adaptive Cards
+        $teamsPayload = @{
+            type = "message"
+            attachments = @(
+                @{
+                    contentType = "application/vnd.microsoft.card.adaptive"
+                    content = @{
+                        type = "AdaptiveCard"
+                        version = "1.4"
+                        body = @(
+                            @{
+                                type = "Container"
+                                style = $color
+                                items = @(
+                                    @{
+                                        type = "TextBlock"
+                                        text = "$icon Alert Consolidation: $AlertType"
+                                        weight = "Bolder"
+                                        size = "Large"
+                                        color = "Light"
+                                    }
+                                )
+                            },
+                            @{
+                                type = "FactSet"
+                                facts = @(
+                                    @{
+                                        title = "Device"
+                                        value = $DeviceName
+                                    },
+                                    @{
+                                        title = "Client"
+                                        value = $clientInfo
+                                    },
+                                    @{
+                                        title = "Site"
+                                        value = $siteInfo
+                                    },
+                                    @{
+                                        title = "Alert Type"
+                                        value = $AlertType
+                                    },
+                                    @{
+                                        title = "Alert Details"
+                                        value = $AlertDetails
+                                    },
+                                    @{
+                                        title = "Alert Count"
+                                        value = "$OccurrenceCount alerts consolidated"
+                                    },
+                                    @{
+                                        title = "Severity"
+                                        value = $severity
+                                    },
+                                    @{
+                                        title = "Ticket ID"
+                                        value = "#$TicketId"
+                                    },
+                                    @{
+                                        title = "Timestamp"
+                                        value = $timestamp
+                                    }
+                                )
+                            },
+                            @{
+                                type = "TextBlock"
+                                text = "Multiple **$AlertType** alerts have been consolidated for device **$DeviceName**. This may indicate a persistent issue requiring attention."
+                                wrap = $true
+                                spacing = "Medium"
+                            }
+                        )
+                        actions = @(
+                            @{
+                                type = "Action.OpenUrl"
+                                title = "View Ticket in HaloPSA"
+                                url = "$($env:HaloURL)/tickets/$TicketId"
+                            }
+                        )
+                    }
+                }
+            )
+        }
+        
+        # Convert to JSON
+        $jsonPayload = $teamsPayload | ConvertTo-Json -Depth 10 -Compress
+        
+        Write-Host "Sending Teams notification for $AlertType consolidation on device $DeviceName (Alert #$OccurrenceCount)"
+        
+        # Send the webhook
+        $null = Invoke-RestMethod -Uri $teamsWebhookUrl -Method POST -Body $jsonPayload -ContentType "application/json" -ErrorAction Stop
+        
+        Write-Host "Teams notification sent successfully for $AlertType consolidation"
+        
+        # Log the notification for monitoring
+        $logEntry = @{
+            Timestamp = $timestamp
+            Device = $DeviceName
+            Client = $clientInfo
+            Site = $siteInfo
+            AlertType = $AlertType
+            AlertDetails = $AlertDetails
+            OccurrenceCount = $OccurrenceCount
+            TicketId = $TicketId
+            Severity = $severity
+            NotificationSent = $true
+        }
+        
+        Write-Host "TEAMS_NOTIFICATION_LOG: $($logEntry | ConvertTo-Json -Compress)"
+        
+    }
+    catch {
+        Write-Error "Failed to send Teams notification for $AlertType consolidation: $($_.Exception.Message)"
+        Write-Host "Teams webhook URL: $teamsWebhookUrl"
+        Write-Host "Error details: $($_.Exception.ToString())"
+        
+        # Log the failure
+        $errorLogEntry = @{
+            Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+            Device = $DeviceName
+            AlertType = $AlertType
+            OccurrenceCount = $OccurrenceCount
+            TicketId = $TicketId
+            NotificationSent = $false
+            Error = $_.Exception.Message
+        }
+        
+        Write-Host "TEAMS_NOTIFICATION_ERROR: $($errorLogEntry | ConvertTo-Json -Compress)"
+    }
+}
+
+function Send-MemoryUsageTeamsNotification {
+    <#
+    .SYNOPSIS
+    Legacy wrapper for memory usage Teams notifications. Calls the generic notification function.
+    
+    .PARAMETER DeviceName
+    The device name experiencing memory issues
+    
+    .PARAMETER MemoryPercentage
+    The current memory usage percentage
+    
+    .PARAMETER OccurrenceCount
+    The number of times this alert has been consolidated
+    
+    .PARAMETER TicketId
+    The HaloPSA ticket ID
+    
+    .PARAMETER AlertWebhook
+    The original alert webhook data
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [int]$MemoryPercentage,
+        [Parameter(Mandatory)]
+        [int]$OccurrenceCount,
+        [Parameter(Mandatory)]
+        [int]$TicketId,
+        [Parameter(Mandatory)]
+        [PSObject]$AlertWebhook
+    )
+    
+    # Call the generic function with memory-specific parameters
+    Send-AlertConsolidationTeamsNotification -DeviceName $DeviceName -AlertType "Memory Usage" -AlertDetails "$MemoryPercentage% memory usage" -OccurrenceCount $OccurrenceCount -TicketId $TicketId -AlertWebhook $AlertWebhook
+    <#
+    .SYNOPSIS
+    Sends a Microsoft Teams notification when memory usage alerts are consolidated multiple times.
+    
+    .PARAMETER DeviceName
+    The device name experiencing memory issues
+    
+    .PARAMETER MemoryPercentage
+    The current memory usage percentage
+    
+    .PARAMETER OccurrenceCount
+    The number of times this alert has been consolidated
+    
+    .PARAMETER TicketId
+    The HaloPSA ticket ID
+    
+    .PARAMETER AlertWebhook
+    The original alert webhook data
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [int]$MemoryPercentage,
+        [Parameter(Mandatory)]
+        [int]$OccurrenceCount,
+        [Parameter(Mandatory)]
+        [int]$TicketId,
+        [Parameter(Mandatory)]
+        [PSObject]$AlertWebhook
+    )
+    
+    try {
+        # Get Teams webhook URL from configuration
+        $teamsWebhookUrl = Get-AlertingConfig -Path "TeamsNotifications.WebhookUrl" -DefaultValue $null
+        
+        if (-not $teamsWebhookUrl) {
+            Write-Warning "Teams webhook URL not configured. Skipping Teams notification."
+            return
+        }
+        
+        # Determine severity based on memory percentage and occurrence count
+        $severity = "Medium"
+        $color = "warning" # Orange
+        
+        if ($MemoryPercentage -ge 95 -or $OccurrenceCount -ge 5) {
+            $severity = "High"
+            $color = "attention" # Red
+        } elseif ($MemoryPercentage -ge 85 -and $OccurrenceCount -ge 3) {
+            $severity = "Medium"
+            $color = "warning" # Orange
+        } else {
+            $severity = "Low"
+            $color = "good" # Green
+        }
+        
+        # Get additional context
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+        $clientInfo = "Unknown Client"
+        $siteInfo = "Unknown Site"
+        
+        # Try to extract client/site info from webhook data
+        if ($AlertWebhook.dattoSiteDetails) {
+            $siteDetails = $AlertWebhook.dattoSiteDetails
+            if ($siteDetails -match "(.+)\((.+)\)") {
+                $siteInfo = $matches[1].Trim()
+                $clientInfo = $matches[2].Trim()
+            } else {
+                $siteInfo = $siteDetails
+            }
+        }
+        
+        # Create the Teams message payload using Adaptive Cards
+        $teamsPayload = @{
+            type = "message"
+            attachments = @(
+                @{
+                    contentType = "application/vnd.microsoft.card.adaptive"
+                    content = @{
+                        type = "AdaptiveCard"
+                        version = "1.4"
+                        body = @(
+                            @{
+                                type = "Container"
+                                style = $color
+                                items = @(
+                                    @{
+                                        type = "TextBlock"
+                                        text = "🚨 Memory Usage Alert Consolidation"
+                                        weight = "Bolder"
+                                        size = "Large"
+                                        color = "Light"
+                                    }
+                                )
+                            },
+                            @{
+                                type = "FactSet"
+                                facts = @(
+                                    @{
+                                        title = "Device"
+                                        value = $DeviceName
+                                    },
+                                    @{
+                                        title = "Client"
+                                        value = $clientInfo
+                                    },
+                                    @{
+                                        title = "Site"
+                                        value = $siteInfo
+                                    },
+                                    @{
+                                        title = "Current Memory Usage"
+                                        value = "$MemoryPercentage%"
+                                    },
+                                    @{
+                                        title = "Alert Count"
+                                        value = "$OccurrenceCount alerts consolidated"
+                                    },
+                                    @{
+                                        title = "Severity"
+                                        value = $severity
+                                    },
+                                    @{
+                                        title = "Ticket ID"
+                                        value = "#$TicketId"
+                                    },
+                                    @{
+                                        title = "Timestamp"
+                                        value = $timestamp
+                                    }
+                                )
+                            },
+                            @{
+                                type = "TextBlock"
+                                text = "Multiple memory usage alerts have been consolidated for device **$DeviceName**. This may indicate a persistent memory issue requiring immediate attention."
+                                wrap = $true
+                                spacing = "Medium"
+                            }
+                        )
+                        actions = @(
+                            @{
+                                type = "Action.OpenUrl"
+                                title = "View Ticket in HaloPSA"
+                                url = "$($env:HaloURL)/tickets/$TicketId"
+                            }
+                        )
+                    }
+                }
+            )
+        }
+        
+        # Convert to JSON
+        $jsonPayload = $teamsPayload | ConvertTo-Json -Depth 10 -Compress
+        
+        Write-Host "Sending Teams notification for device $DeviceName (Alert #$OccurrenceCount, $MemoryPercentage% memory usage)"
+        
+        # Send the webhook
+        $response = Invoke-RestMethod -Uri $teamsWebhookUrl -Method POST -Body $jsonPayload -ContentType "application/json" -ErrorAction Stop
+        
+        Write-Host "Teams notification sent successfully for memory usage consolidation"
+        
+        # Log the notification for monitoring
+        $logEntry = @{
+            Timestamp = $timestamp
+            Device = $DeviceName
+            Client = $clientInfo
+            Site = $siteInfo
+            MemoryPercentage = $MemoryPercentage
+            OccurrenceCount = $OccurrenceCount
+            TicketId = $TicketId
+            Severity = $severity
+            NotificationSent = $true
+        }
+        
+        Write-Host "TEAMS_NOTIFICATION_LOG: $($logEntry | ConvertTo-Json -Compress)"
+        
+    }
+    catch {
+        Write-Error "Failed to send Teams notification for memory usage consolidation: $($_.Exception.Message)"
+        Write-Host "Teams webhook URL: $teamsWebhookUrl"
+        Write-Host "Error details: $($_.Exception.ToString())"
+        
+        # Log the failure
+        $errorLogEntry = @{
+            Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+            Device = $DeviceName
+            MemoryPercentage = $MemoryPercentage
+            OccurrenceCount = $OccurrenceCount
+            TicketId = $TicketId
+            NotificationSent = $false
+            Error = $_.Exception.Message
+        }
+        
+        Write-Host "TEAMS_NOTIFICATION_ERROR: $($errorLogEntry | ConvertTo-Json -Compress)"
+    }
+}
+
 # Export the public functions
 Export-ModuleMember -Function @(
     'New-HaloTicketWithFallback',
@@ -732,5 +1495,10 @@ Export-ModuleMember -Function @(
     'Invoke-DefaultAlert',
     'Find-ExistingSecurityAlert',
     'Update-ExistingSecurityTicket',
-    'Test-AlertConsolidation'
+    'Test-AlertConsolidation',
+    'Find-ExistingMemoryUsageAlert',
+    'Test-MemoryUsageConsolidation',
+    'Update-ExistingMemoryUsageTicket',
+    'Send-AlertConsolidationTeamsNotification',
+    'Send-MemoryUsageTeamsNotification'
 )
