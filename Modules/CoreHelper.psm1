@@ -83,9 +83,11 @@ function Get-DecodedTable {
     # "mscorsvw:48.7,system:1.3,msmpeng:0.6"
     $Parsed = $TableString -split "," | ForEach-Object {
         $Values = $_ -split ":"
+        # Ensure Values is a proper array for safe indexing
+        $ValuesArray = @($Values)
         [pscustomobject]@{
-            Application     = $Values[0]
-            "Use $UseValue" = $Values[1]
+            Application     = if ($ValuesArray.Count -gt 0) { $ValuesArray[0] } else { "" }
+            "Use $UseValue" = if ($ValuesArray.Count -gt 1) { $ValuesArray[1] } else { "" }
         }
     }
 
