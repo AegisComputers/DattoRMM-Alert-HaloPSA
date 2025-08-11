@@ -607,7 +607,14 @@ function Update-ExistingSecurityTicket {
         
         # Check if we've reached max consolidation limit
         $currentNotes = Get-HaloTicket -TicketID $ExistingTicket.id -IncludeDetails
-        $consolidationNotes = $currentNotes.actions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" }
+        
+        # Safely access actions property
+        $consolidationNotes = @()
+        if ($currentNotes -and $currentNotes.PSObject.Properties.Name -contains 'actions' -and $currentNotes.actions) {
+            $consolidationNotes = $currentNotes.actions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" }
+        } else {
+            Write-Warning "Ticket $($ExistingTicket.id) has no actions property or actions is null. Proceeding with count of 0."
+        }
         $currentCount = $consolidationNotes.Count + 1 # +1 for the original ticket
         
         if ($currentCount -ge $maxCount) {
