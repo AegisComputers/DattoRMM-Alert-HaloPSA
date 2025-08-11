@@ -96,7 +96,8 @@ if ($Email) {
     # Check if Device Report already exists, if not create it
     $ExistingDeviceReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Device Report"
     if ($ExistingDeviceReports -and $ExistingDeviceReports.Count -gt 0) {
-        $HaloDeviceReport = $ExistingDeviceReports[0]
+        # Safe indexing for PSObject compatibility
+        $HaloDeviceReport = if ($ExistingDeviceReports -is [array]) { $ExistingDeviceReports[0] } else { $ExistingDeviceReports }
         Write-Host "Using existing Device Report with ID: $($HaloDeviceReport.id)"
     } else {
         $HaloDeviceReport = @{
@@ -117,7 +118,8 @@ if ($Email) {
     # Check if Alerts Report already exists, if not create it
     $ExistingAlertsReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
     if ($ExistingAlertsReports -and $ExistingAlertsReports.Count -gt 0) {
-        $HaloAlertsReportBase = $ExistingAlertsReports[0]
+        # Safe indexing for PSObject compatibility
+        $HaloAlertsReportBase = if ($ExistingAlertsReports -is [array]) { $ExistingAlertsReports[0] } else { $ExistingAlertsReports }
         Write-Host "Using existing Alerts Report with ID: $($HaloAlertsReportBase.id)"
     } else {
         $HaloAlertsReportBase = @{
@@ -171,8 +173,17 @@ if ($Email) {
 
     #Process based on naming scheme in Datto <site>(<Customer>)
     $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
-    $DattoCustomer = $dataSiteDetails[1] 
-    $HaloClientID = (Get-HaloClient -Search $DattoCustomer)[0].id
+    # Safe indexing for PSObject compatibility
+    $DattoCustomer = if ($dataSiteDetails -is [array] -and $dataSiteDetails.Count -gt 1) { $dataSiteDetails[1] } else { "Unknown" }
+    
+    # Safe client lookup with error handling
+    try {
+        $HaloClients = Get-HaloClient -Search $DattoCustomer
+        $HaloClientID = if ($HaloClients -is [array] -and $HaloClients.Count -gt 0) { $HaloClients[0].id } elseif ($HaloClients) { $HaloClients.id } else { $null }
+    } catch {
+        Write-Warning "Error getting Halo client: $($_.Exception.Message)"
+        $HaloClientID = $null
+    }
 
     $HaloClientDattoMatch = $HaloClientID
     

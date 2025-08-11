@@ -543,8 +543,10 @@ function Find-ExistingSecurityAlert {
                 Write-Host "Selected ticket ID $($selectedTicket.id) as the most recent for consolidation"
                 return $selectedTicket
             } elseif ($matchingTickets.Count -eq 1) {
-                Write-Host "Found single matching ticket for consolidation: ID $($matchingTickets[0].id)"
-                return $matchingTickets[0]
+                # Safe indexing for single item
+                $singleTicket = if ($matchingTickets -is [array]) { $matchingTickets[0] } else { $matchingTickets }
+                Write-Host "Found single matching ticket for consolidation: ID $($singleTicket.id)"
+                return $singleTicket
             }
         }
         
