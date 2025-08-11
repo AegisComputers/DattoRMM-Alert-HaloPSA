@@ -1107,9 +1107,20 @@ function Send-AlertConsolidationTeamsNotification {
     )
     
     try {
-        # Get Teams webhook URL from configuration
-        $teamsWebhookUrl = Get-AlertingConfig -Path "TeamsNotifications.WebhookUrl" -DefaultValue "https://default2345c4f24d2a4b47a228dc64d28cf1.7e.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/05ade4788ca842c7a5cb380ddc46b446/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Z1w5yLkMy0NCvmofz36CXtdX4SiB8FPV61mbXHzvXj4"
+        # Check if we've already sent a Teams notification today for this device/alert type
+        if (Test-DailyTeamsNotificationSent -DeviceName $DeviceName -AlertType $AlertType) {
+            Write-Host "Skipping Teams notification - already sent today for $DeviceName ($AlertType)"
+            return
+        }
         
+        # Get Teams webhook configuration
+        $teamsConfig = Get-TeamsWebhookConfig
+        if (-not $teamsConfig -or -not $teamsConfig.TeamsNotifications.EnableNotifications) {
+            Write-Host "Teams notifications are disabled. Skipping notification."
+            return
+        }
+        
+        $teamsWebhookUrl = $teamsConfig.TeamsNotifications.WebhookUrl
         if (-not $teamsWebhookUrl) {
             Write-Warning "Teams webhook URL not configured. Skipping Teams notification."
             return
@@ -1272,7 +1283,7 @@ function Send-AlertConsolidationTeamsNotification {
                             @{
                                 type = "Action.OpenUrl"
                                 title = "View Ticket in HaloPSA"
-                                url = "$($env:HaloURL)/tickets/$TicketId"
+                                url = "https://support.aegis-group.co.uk/tickets?id=$TicketId"
                             }
                         )
                     }
@@ -1289,6 +1300,9 @@ function Send-AlertConsolidationTeamsNotification {
         $null = Invoke-RestMethod -Uri $teamsWebhookUrl -Method POST -Body $jsonPayload -ContentType "application/json" -ErrorAction Stop
         
         Write-Host "Teams notification sent successfully for $AlertType consolidation"
+        
+        # Record that we've sent a notification today for this device/alert type
+        Record-DailyTeamsNotificationSent -DeviceName $DeviceName -AlertType $AlertType -TicketId $TicketId
         
         # Log the notification for monitoring
         $logEntry = @{
@@ -1324,6 +1338,113 @@ function Send-AlertConsolidationTeamsNotification {
         }
         
         Write-Host "TEAMS_NOTIFICATION_ERROR: $($errorLogEntry | ConvertTo-Json -Compress)"
+    }
+}
+
+function Test-DailyTeamsNotificationSent {
+    <#
+    .SYNOPSIS
+    Checks if a Teams notification has already been sent today for a specific device and alert type.
+    
+    .PARAMETER DeviceName
+    The device name
+    
+    .PARAMETER AlertType
+    The type of alert (e.g., "Memory Usage", "Security")
+    
+    .RETURNS
+    True if notification was already sent today, False otherwise
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [string]$AlertType
+    )
+    
+    try {
+        # Check if we have storage access
+        if (-not $table) {
+            Write-Host "Azure Table storage not available, allowing notification"
+            return $false
+        }
+        
+        # Create unique identifier for this device/alert combination
+        $today = Get-Date -Format "yyyy-MM-dd"
+        $partitionKey = "TeamsNotifications"
+        $rowKey = "$DeviceName-$AlertType-$today"
+        
+        # Query for existing record
+        $existingRecord = Get-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey -ErrorAction SilentlyContinue
+        
+        if ($existingRecord) {
+            Write-Host "Teams notification already sent today for $DeviceName ($AlertType)"
+            return $true
+        } else {
+            Write-Host "No Teams notification sent today for $DeviceName ($AlertType)"
+            return $false
+        }
+    } catch {
+        Write-Warning "Failed to check Teams notification history: $($_.Exception.Message)"
+        # On error, allow the notification to be sent
+        return $false
+    }
+}
+
+function Record-DailyTeamsNotificationSent {
+    <#
+    .SYNOPSIS
+    Records that a Teams notification has been sent for a specific device and alert type today.
+    
+    .PARAMETER DeviceName
+    The device name
+    
+    .PARAMETER AlertType
+    The type of alert (e.g., "Memory Usage", "Security")
+    
+    .PARAMETER TicketId
+    The associated ticket ID
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        [Parameter(Mandatory)]
+        [string]$AlertType,
+        [Parameter(Mandatory)]
+        [int]$TicketId
+    )
+    
+    try {
+        # Check if we have storage access
+        if (-not $table) {
+            Write-Host "Azure Table storage not available, skipping notification record"
+            return
+        }
+        
+        # Create unique identifier for this device/alert combination
+        $today = Get-Date -Format "yyyy-MM-dd"
+        $timestamp = Get-Date
+        $partitionKey = "TeamsNotifications"
+        $rowKey = "$DeviceName-$AlertType-$today"
+        
+        # Create record
+        $record = @{
+            PartitionKey = $partitionKey
+            RowKey = $rowKey
+            DeviceName = $DeviceName
+            AlertType = $AlertType
+            TicketId = $TicketId
+            NotificationDate = $today
+            Timestamp = $timestamp
+        }
+        
+        # Store the record
+        $null = Add-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey -Property $record -ErrorAction Stop
+        Write-Host "Recorded Teams notification for $DeviceName ($AlertType) - Ticket #$TicketId"
+        
+    } catch {
+        Write-Warning "Failed to record Teams notification: $($_.Exception.Message)"
+        # Don't throw error - notification was already sent successfully
     }
 }
 
@@ -1419,5 +1540,7 @@ Export-ModuleMember -Function @(
     'Update-ExistingMemoryUsageTicket',
     'Get-TeamsWebhookConfig',
     'Send-AlertConsolidationTeamsNotification',
-    'Send-MemoryUsageTeamsNotification'
+    'Send-MemoryUsageTeamsNotification',
+    'Test-DailyTeamsNotificationSent',
+    'Record-DailyTeamsNotificationSent'
 )
