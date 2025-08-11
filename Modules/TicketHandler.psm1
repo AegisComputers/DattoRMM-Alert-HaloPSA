@@ -1039,12 +1039,12 @@ function Send-AlertConsolidationTeamsNotification {
         # Determine severity and color based on alert type and occurrence count
         $severity = "Medium"
         $color = "warning" # Orange
-        $icon = "⚠️"
+        $icon = "[WARN]"
         
         # Set severity based on alert type and occurrence count
         switch ($AlertType.ToLower()) {
             "security" {
-                $icon = "🔒"
+                $icon = "[LOCK]"
                 if ($OccurrenceCount -ge 5) {
                     $severity = "Critical"
                     $color = "attention" # Red
@@ -1057,7 +1057,7 @@ function Send-AlertConsolidationTeamsNotification {
                 }
             }
             "memory usage" {
-                $icon = "🧠"
+                $icon = "[MEM]"
                 # Check if memory percentage is in alert details
                 if ($AlertDetails -match "(\d+)%") {
                     $memoryPercentage = [int]$matches[1]
@@ -1071,7 +1071,7 @@ function Send-AlertConsolidationTeamsNotification {
                 }
             }
             "disk usage" {
-                $icon = "💾"
+                $icon = "�"
                 if ($OccurrenceCount -ge 5) {
                     $severity = "High"
                     $color = "attention"
@@ -1081,7 +1081,7 @@ function Send-AlertConsolidationTeamsNotification {
                 }
             }
             "event log" {
-                $icon = "📋"
+                $icon = "[LOG]"
                 if ($OccurrenceCount -ge 10) {
                     $severity = "High"
                     $color = "attention"
@@ -1091,7 +1091,7 @@ function Send-AlertConsolidationTeamsNotification {
                 }
             }
             default {
-                $icon = "🚨"
+                $icon = "[ALERT]"
                 if ($OccurrenceCount -ge 5) {
                     $severity = "High"
                     $color = "attention"
