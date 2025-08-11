@@ -15,7 +15,8 @@ function Invoke-HaloReport {
 	} elseif ($FoundReportCount -gt 1) {
 		# Handle multiple reports gracefully - use the first one and log a warning instead of throwing
 		Write-Warning "Found multiple reports with the name '$($report.name)'. Using the first one. Consider cleaning up duplicate reports."
-		$HaloReportBase = $HaloReportBase[0]
+		# Safe indexing for PSObject compatibility
+		$HaloReportBase = if ($HaloReportBase -is [array]) { $HaloReportBase[0] } else { $HaloReportBase }
 	}
 
     if ($IncludeReport) {
@@ -36,8 +37,9 @@ function Find-DattoAlertHaloSite {
 
         #Process based on naming scheme in Datto <site>(<Customer>)
         $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
-        $DattoSite = $dataSiteDetails[0] 
-        $DattoCustomer = $dataSiteDetails[1] 
+        # Safe indexing for PSObject compatibility
+        $DattoSite = if ($dataSiteDetails -is [array] -and $dataSiteDetails.Count -gt 0) { $dataSiteDetails[0] } else { "Unknown" }
+        $DattoCustomer = if ($dataSiteDetails -is [array] -and $dataSiteDetails.Count -gt 1) { $dataSiteDetails[1] } else { "Unknown" } 
         
         # Add error handling for client lookup
         $HaloClients = Get-HaloClient -Search $DattoCustomer
@@ -48,20 +50,24 @@ function Find-DattoAlertHaloSite {
             Write-Warning "No Halo client found for '$DattoCustomer'. Using $defaultClientName ($defaultSiteId)."
             return $defaultSiteId
         }
-        $HaloClientID = $HaloClients[0].id
+        # Safe client indexing
+        $HaloClientID = if ($HaloClients -is [array]) { $HaloClients[0].id } else { $HaloClients.id }
         
         #Does <site> exist in Halo if not select <Customer> and select the first ID
         if ($SiteInfo = Get-HaloSite -Search $DattoSite -ClientID $HaloClientID) {
             Write-Host "Found Site with Client id of $($HaloClientID)"
-            $HaloSiteID = $SiteInfo[0].id 
+            # Safe site indexing
+            $HaloSiteID = if ($SiteInfo -is [array]) { $SiteInfo[0].id } else { $SiteInfo.id }
         } elseif ($SiteInfo = Get-HaloSite -Search $DattoCustomer) {
             Write-Host "No Site found defaulting to Customer for site lookup. Will Map to Site named : Head Office IF existing"
             if ($siteDrillD = ($SiteInfo | Where-Object {$_.ClientSite_Name -match "Head Office"})) {
                 Write-Host "Head Office found"
-                $HaloSiteID = $siteDrillD[0].id
+                # Safe site drill-down indexing
+                $HaloSiteID = if ($siteDrillD -is [array]) { $siteDrillD[0].id } else { $siteDrillD.id }
             } else {
                 Write-Host "Head Office not found. Defaulting to first created site"
-                $HaloSiteID = $SiteInfo[0].id
+                # Safe site indexing for fallback
+                $HaloSiteID = if ($SiteInfo -is [array]) { $SiteInfo[0].id } else { $SiteInfo.id }
             }
         } else {
             Write-Host "No Valid Site or Customer Found Setting to $defaultClientName"
@@ -86,7 +92,8 @@ function Find-DattoAlertHaloClient {
         $dattoLookupString = $DattoSiteName
         #Process based on naming scheme in Datto <site>(<Customer>)
         $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
-        $DattoCustomer = $dataSiteDetails[1] 
+        # Safe indexing for PSObject compatibility
+        $DattoCustomer = if ($dataSiteDetails -is [array] -and $dataSiteDetails.Count -gt 1) { $dataSiteDetails[1] } else { "Unknown" } 
         
         # Add error handling for client lookup
         $HaloClients = Get-HaloClient -Search $DattoCustomer
@@ -94,7 +101,8 @@ function Find-DattoAlertHaloClient {
             Write-Warning "No Halo client found for '$DattoCustomer'."
             return $null
         }
-        $HaloClientID = $HaloClients[0].id
+        # Safe client indexing
+        $HaloClientID = if ($HaloClients -is [array]) { $HaloClients[0].id } else { $HaloClients.id }
 
         Write-Host "Selected Client Id of $($HaloClientID)"
 
