@@ -24,11 +24,8 @@ try {
         throw "Invalid request: Missing alertUID in request body"
     }
 
-    #Respond Request Ok
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::Accepted
-            Body       = 'Request accepted. Processing in the background.'
-        })
+    # Initialize response variable
+    $responseToSend = $null
 
     #Halo Vars with validation
     $HaloClientID = $env:HaloClientID
@@ -62,13 +59,23 @@ Set-DrmmApiParameters @paramsDatto
 # $ReoccurringTicketHours = Get-AlertingConfig -Path "AlertThresholds.ReoccurringTicketHours" -DefaultValue 24
 # $HaloAlertHistoryDays = Get-AlertingConfig -Path "AlertThresholds.HaloAlertHistoryDays" -DefaultValue 30
 
-#Priority Mapping from configuration
-$PriorityHaloMap = Get-AlertingConfig -Path "PriorityMapping" -DefaultValue @{
+#Priority Mapping from configuration - ensure it's a proper hashtable
+$PriorityMapConfig = Get-AlertingConfig -Path "PriorityMapping" -DefaultValue @{
     "Critical"    = "4"
     "High"        = "4"
     "Moderate"    = "4"
     "Low"         = "4"
     "Information" = "4"
+}
+
+# Convert to proper hashtable if it's a PSObject
+if ($PriorityMapConfig -is [PSObject] -and $PriorityMapConfig -isnot [hashtable]) {
+    $PriorityHaloMap = @{}
+    $PriorityMapConfig.PSObject.Properties | ForEach-Object {
+        $PriorityHaloMap[$_.Name] = $_.Value
+    }
+} else {
+    $PriorityHaloMap = $PriorityMapConfig
 }
 
 #AlertWebhook Body
@@ -145,7 +152,11 @@ if ($Email) {
     }
 
     # Map the priority of the alert to the corresponding Halo priority using the priority mapping
-    $HaloPriority = $PriorityHaloMap."$($Alert.Priority)"
+    $alertPriority = if ($Alert.Priority) { $Alert.Priority.ToString() } else { "Information" }
+    $HaloPriority = $PriorityHaloMap[$alertPriority]
+    if (-not $HaloPriority) {
+        $HaloPriority = $PriorityHaloMap["Information"] # Default fallback
+    }
 
     # Retrieve the site details from the request body (Datto site details)
     $RSiteDetails = $Request.Body.dattoSiteDetails
@@ -342,11 +353,23 @@ if ($Email) {
     $totalDuration = New-TimeSpan -Start $startTime -End $endTime
     Write-Host "Total processing time: $($totalDuration.TotalSeconds) seconds"
     
+    # Set success response
+    $responseToSend = @{
+        StatusCode = [HttpStatusCode]::OK
+        Body       = "Alert processed successfully"
+    }
+    
 } else {
         Write-Host "No alert found. This webhook shouldn't be triggered this way except when testing!!!!"
         $endTime = Get-Date
         $totalDuration = New-TimeSpan -Start $startTime -End $endTime
         Write-Host "Total processing time (no alert): $($totalDuration.TotalSeconds) seconds"
+        
+        # Set response for no alert case
+        $responseToSend = @{
+            StatusCode = [HttpStatusCode]::BadRequest
+            Body       = "No alert found in request"
+        }
 }
 }
 catch {
@@ -374,9 +397,17 @@ catch {
     
     Write-Host "ERROR_DETAILS: $($errorDetails | ConvertTo-Json -Compress)"
     
-    # Return error response
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    # Set error response
+    $responseToSend = @{
         StatusCode = [HttpStatusCode]::InternalServerError
         Body       = "Error processing alert: $errorMessage"
+    }
+}
+
+# Send the final response (only one Push-OutputBinding call in entire script)
+if ($responseToSend) {
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = $responseToSend.StatusCode
+        Body       = $responseToSend.Body
     })
 }
