@@ -400,6 +400,15 @@ Function Get-AlertEmailBody($AlertWebhook) {
         endpoint_security_threat_ctx = "Endpoint Security"
     }
 
+    # Convert to proper hashtable if it's a PSObject to prevent indexing errors
+    if ($AlertTypesLookup -is [PSObject] -and $AlertTypesLookup -isnot [hashtable]) {
+        $AlertTypesHashtable = @{}
+        $AlertTypesLookup.PSObject.Properties | ForEach-Object {
+            $AlertTypesHashtable[$_.Name] = $_.Value
+        }
+        $AlertTypesLookup = $AlertTypesHashtable
+    }
+
     $params = @{
         Url       = $DattoURL
         Key       = $DattoKey
