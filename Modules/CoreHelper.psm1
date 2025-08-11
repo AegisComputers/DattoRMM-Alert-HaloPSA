@@ -1,4 +1,7 @@
 
+# CoreHelper Module - Storage and utility functions for DattoRMM-HaloPSA integration
+Set-StrictMode -Version Latest
+
 function Get-MapColour {
     param (
         $MapList,
@@ -480,7 +483,7 @@ function Get-StorageTable {
 }
 
 # Function to insert or merge entity
-function InsertOrMergeEntity {
+function Add-StorageEntity {
     param (
         [Microsoft.Azure.Cosmos.Table.CloudTable]$table,
         [Microsoft.Azure.Cosmos.Table.DynamicTableEntity]$entity
@@ -490,7 +493,7 @@ function InsertOrMergeEntity {
     return $result.Result
 }
 
-function GetEntity {
+function Get-StorageEntity {
     param (
         $table,
         $partitionKey,
@@ -731,3 +734,19 @@ $AlertPriority Alert - $DeviceHostname
         return $StreamlinedHTMLBody -replace '\[FINAL_SIZE\]', $FinalSize
     }
 }
+
+# Export the public functions
+Export-ModuleMember -Function @(
+    'Get-MapColour',
+    'Get-HeatMap', 
+    'Get-DecodedTable',
+    'Get-AlertDescription',
+    'Get-AlertHaloType',
+    'Get-HTMLBody',
+    'Get-AlertEmailBody',
+    'Get-StorageContext',
+    'Get-StorageTable',
+    'Add-StorageEntity',
+    'Get-StorageEntity',
+    'Optimize-HtmlContentForTicket'
+)

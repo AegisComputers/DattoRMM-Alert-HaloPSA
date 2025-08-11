@@ -1,3 +1,6 @@
+# EmailHelper Module - Email and user response management for HaloPSA integration
+Set-StrictMode -Version Latest
+
 <#
 .SYNOPSIS
 Retrieves the email address for a specified Halo user.
@@ -108,6 +111,8 @@ function Send-HaloEmailResponse {
             outcome               = "Email User"              # Description of the outcome
             outcome_id            = 72                        # Presumed identifier for the "Email User" outcome
             new_status            = 20                        # end status of ticket
+            actionarrivaldate     = $dateArrival             # Action arrival time
+            actioncompletiondate  = $dateEnd                 # Action completion time
             emailto               = $EmailAddress             # Recipient's email address
             note_html             = $EmailMessage             # The message body to be sent
             timetaken             = 0.016314166666666668      # 1 minute of time
@@ -147,8 +152,8 @@ The ticket ID associated with the Halo action.
 Send-HaloEmailResponse -EmailAddress "user@example.com" -EmailMessage "Your issue has been resolved." -TicketId 1001
 Sends an email to 'user@example.com' with the message "Your issue has been resolved." for ticket ID 1001.
 #>
-function FindAndSendHaloResponse {
-    # Define the function with the name 'FindAndSendHaloResponse'
+function Send-HaloUserResponse {
+    # Define the function with the name 'Send-HaloUserResponse'
     # It is declared with [CmdletBinding()] to enable advanced cmdlet functionality
     [CmdletBinding()]
     param (
@@ -202,4 +207,4 @@ function FindAndSendHaloResponse {
 }
 
 # Exporting Module Members
-Export-ModuleMember -Function Get-HaloUserEmail, Send-HaloEmailResponse, FindAndSendHaloResponse
+Export-ModuleMember -Function Get-HaloUserEmail, Send-HaloEmailResponse, Send-HaloUserResponse

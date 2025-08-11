@@ -4,21 +4,37 @@ using namespace Microsoft.Azure.Cosmos.Table
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
 
+# Set up error handling
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
 # Start performance tracking
 $startTime = Get-Date
-Write-Host "Processing Webhook for Alert with the UID of - $($Request.Body.alertUID) -"
+$alertUID = $Request.Body.alertUID
 
-#Respond Request Ok
-Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-        StatusCode = [HttpStatusCode]::Accepted
-        Body       = 'Request accepted. Processing in the background.'
-    })
+try {
+    Write-Host "Processing Webhook for Alert with the UID of - $alertUID -"
 
-#Halo Vars
-$HaloClientID = $env:HaloClientID
-$HaloClientSecret = $env:HaloClientSecret
-$HaloURL = $env:HaloURL
-$HaloTicketStatusID = $env:HaloTicketStatusID
+    # Validate incoming request
+    if (-not $Request -or -not $Request.Body) {
+        throw "Invalid request: Missing request body"
+    }
+
+    if (-not $alertUID) {
+        throw "Invalid request: Missing alertUID in request body"
+    }
+
+    #Respond Request Ok
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::Accepted
+            Body       = 'Request accepted. Processing in the background.'
+        })
+
+    #Halo Vars with validation
+    $HaloClientID = $env:HaloClientID
+    $HaloClientSecret = $env:HaloClientSecret
+    $HaloURL = $env:HaloURL
+    $HaloTicketStatusID = $env:HaloTicketStatusID
 $HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
 $HaloTicketType = $env:HaloTicketType
 $HaloReocurringStatus = $env:HaloReocurringStatus
@@ -109,37 +125,6 @@ if ($Email) {
         Write-Host "Created new Alerts Report with ID: $($HaloAlertsReportBase.id)"
     }
 
-    # $HaloAlertsReport = Invoke-HaloReport -Report $HaloAlertsReportBase
-
-    # Alert report filtering for potential future correlation logic
-    # $AlertReportFilter = @{
-    #     id                       = $HaloAlertsReport.id
-    #     filters                  = @(
-    #         @{
-    #             fieldname      = 'inventorynumber'
-    #             stringruletype = 2
-    #             stringruletext = "$($HaloDevice.did)"
-    #         }
-    #     )
-    #     _loadreportonly          = $true
-    #     reportingperiodstartdate = get-date(((Get-date).ToUniversalTime()).adddays(-$HaloAlertHistoryDays)) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
-    #     reportingperiodenddate   = get-date((Get-date -Hour 23 -Minute 59 -second 59).ToUniversalTime()) -UFormat '+%Y-%m-%dT%H:%M:%SZ'
-    #     reportingperioddatefield = "dateoccured"
-    #     reportingperiod          = "7"
-    # }
-
-    # Retrieve the report rows from a Halo report based on the given alert report filter
-    # $ReportResults = (Set-HaloReport -Report $AlertReportFilter).report.rows
-
-    # Filter the report results to find any history of recurring alerts that match the specific alert type
-    # $ReoccuringHistory = $ReportResults | where-object { $_.CFDattoAlertType -eq $ParsedAlertType } 
-    
-    # Further filter the recurring alerts to find those that occurred within the specified time frame
-    # $ReoccuringAlerts = $ReoccuringHistory | where-object { $_.dateoccured -gt ((Get-Date).addhours(-$ReoccurringTicketHours)) }
-
-    # Find related alerts that occurred within a different specified time frame and are of a different alert type
-    # $RelatedAlerts = $ReportResults | where-object { $_.dateoccured -gt ((Get-Date).addminutes(-$RelatedAlertMinutes)).ToUniversalTime() -and $_.CFDattoAlertType -ne $ParsedAlertType }
-    
     # Capture the subject of the email alert
     $TicketSubject = $Email.Subject
 
@@ -314,7 +299,18 @@ if ($Email) {
     } else {
         # Check for alert consolidation before creating new tickets
         Write-Host "Checking if alert should be consolidated with existing ticket..."
-        $wasConsolidated = Test-AlertConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+        
+        # First check for memory usage alerts
+        $wasConsolidated = $false
+        if ($TicketSubject -like "*Memory Usage reached*") {
+            Write-Host "Detected memory usage alert, checking for memory usage consolidation..."
+            $wasConsolidated = Test-MemoryUsageConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+        }
+        
+        # If not a memory usage alert or memory consolidation failed, try general consolidation
+        if (-not $wasConsolidated) {
+            $wasConsolidated = Test-AlertConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+        }
         
         if ($wasConsolidated) {
             Write-Host "Alert was successfully consolidated with existing ticket. No new ticket created."
@@ -324,18 +320,18 @@ if ($Email) {
             # Handle Specific Ticket responses based on ticket subject type
             # Check if the alert message contains the specific disk usage alert for the C: drive
             if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
-                Handle-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
+                Invoke-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
             } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
-                Handle-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
             } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
-                Handle-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
-                #Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
+                #Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
             } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
-                Handle-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
             } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
-                Handle-HostsAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-HostsAlert -HaloTicketCreate $HaloTicketCreate
             } else {
-                Handle-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+                Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
             }
         }
     }
@@ -351,4 +347,35 @@ if ($Email) {
         $endTime = Get-Date
         $totalDuration = New-TimeSpan -Start $startTime -End $endTime
         Write-Host "Total processing time (no alert): $($totalDuration.TotalSeconds) seconds"
+}
+}
+catch {
+    $endTime = Get-Date
+    $totalDuration = New-TimeSpan -Start $startTime -End $endTime
+    
+    $errorMessage = $_.Exception.Message
+    $errorLine = $_.InvocationInfo.ScriptLineNumber
+    $errorCommand = $_.InvocationInfo.MyCommand.Name
+    
+    Write-Error "CRITICAL ERROR processing alert $alertUID after $($totalDuration.TotalSeconds) seconds"
+    Write-Error "Error at line $errorLine in $errorCommand`: $errorMessage"
+    Write-Error "Full exception: $($_.Exception.ToString())"
+    
+    # Log structured error information for monitoring
+    $errorDetails = @{
+        AlertUID = $alertUID
+        Error = $errorMessage
+        Line = $errorLine
+        Command = $errorCommand
+        Duration = $totalDuration.TotalSeconds
+        Timestamp = $endTime.ToString('yyyy-MM-dd HH:mm:ss')
+    }
+    
+    Write-Host "ERROR_DETAILS: $($errorDetails | ConvertTo-Json -Compress)"
+    
+    # Return error response
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [HttpStatusCode]::InternalServerError
+        Body       = "Error processing alert: $errorMessage"
+    })
 }

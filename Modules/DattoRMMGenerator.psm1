@@ -1,12 +1,15 @@
 
+# DattoRMMGenerator Module - Alert formatting and color management
+Set-StrictMode -Version Latest
+
 function Get-DRMMAlertColour {
     <#
-    This function returns the datto themed alert piority colours.
+    This function returns the datto themed alert priority colours.
     #>
     param (
         $Priority
     )
-    Switch ($Alert.Priority) {
+    Switch ($Priority) {
         'Critical' { $Colour = ' background-color:#EC422E; color:#1C3E4C' }
         'High' { $Colour = ' background-color:#F68218; color:#1C3E4C' }
         'Moderate' { $Colour = ' background-color:#F7C210; color:#1C3E4C' }
@@ -42,7 +45,7 @@ function Get-DRMMAlertDetailsSection {
         $DocLinkHTML = ''
     }
     
-    $Colour = Get-DRMMAlertColour -Piority $Alert.Priority
+    $Colour = Get-DRMMAlertColour -Priority $Alert.Priority
 
     $SectionHTML = @"
     <!-- Alert Detaills HTML Start -->
@@ -109,7 +112,6 @@ function Get-DRMMAlertDetailsSection {
     }
 
     $Sections.add($AlertDetailsSection)
-
 }
 
 function Get-DRMMDeviceDetailsSection {
@@ -349,3 +351,12 @@ function Get-DRMMAlertHistorySection {
     $Sections.add($AlertHistorySection)
     
 }
+
+# Export the public functions
+Export-ModuleMember -Function @(
+    'Get-DRMMAlertColour',
+    'Get-DRMMAlertDetailsSection',
+    'Get-DRMMDeviceDetailsSection',
+    'Get-DRMMDeviceStatusSection',
+    'Get-DRMMAlertHistorySection'
+)
