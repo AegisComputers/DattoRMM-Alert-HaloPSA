@@ -357,9 +357,10 @@ catch {
     $errorLine = $_.InvocationInfo.ScriptLineNumber
     $errorCommand = $_.InvocationInfo.MyCommand.Name
     
-    Write-Error "CRITICAL ERROR processing alert $alertUID after $($totalDuration.TotalSeconds) seconds"
-    Write-Error "Error at line $errorLine in $errorCommand`: $errorMessage"
-    Write-Error "Full exception: $($_.Exception.ToString())"
+    # Use Write-Host instead of Write-Error to avoid ErrorActionPreference issues
+    Write-Host "CRITICAL ERROR processing alert $alertUID after $($totalDuration.TotalSeconds) seconds" -ForegroundColor Red
+    Write-Host "Error at line $errorLine in $errorCommand`: $errorMessage" -ForegroundColor Red
+    Write-Host "Full exception: $($_.Exception.ToString())" -ForegroundColor Red
     
     # Log structured error information for monitoring
     $errorDetails = @{

@@ -21,14 +21,28 @@ $tableName = "DevicePatchAlerts"
 $coldStartTime = Get-Date
 Write-Host "Function App cold start at: $coldStartTime"
 
-#Custom Modules
-foreach($file in Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter *.psm1){
-    try {
-        Import-Module $file.FullName
-        Write-Host "Module $($file.Name) loaded successfully."
-    } catch {
-        Write-Host "Failed to load module $($file.Name). Error: $_"
-        throw
+#Custom Modules - Load in dependency order
+$moduleLoadOrder = @(
+    "CoreHelper.psm1",
+    "ConfigurationManager.psm1", 
+    "EmailHelper.psm1",
+    "HaloHelper.psm1",
+    "DattoRMMGenerator.psm1",
+    "TicketHandler.psm1"
+)
+
+foreach($moduleName in $moduleLoadOrder){
+    $moduleFile = Get-ChildItem -Path "$PSScriptRoot\Modules" -Filter $moduleName -ErrorAction SilentlyContinue
+    if ($moduleFile) {
+        try {
+            Import-Module $moduleFile.FullName -Force
+            Write-Host "Module $($moduleFile.Name) loaded successfully."
+        } catch {
+            Write-Host "Failed to load module $($moduleFile.Name). Error: $_"
+            throw
+        }
+    } else {
+        Write-Warning "Module $moduleName not found in Modules directory"
     }
 }
 

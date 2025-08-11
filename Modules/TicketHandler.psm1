@@ -38,7 +38,9 @@ try {
 
     # Validate storage configuration
     if (-not $storageAccountKey) {
-        Write-Error "Storage account key is not set. Please set the environment variable 'strKey'." -ErrorAction Stop
+        Write-Warning "Storage account key is not set. Please set the environment variable 'strKey'."
+        Write-Warning "Storage-dependent functions may not work correctly."
+        # Don't stop module loading, just warn
     }
 
     # Halo Vars with validation
@@ -57,13 +59,18 @@ try {
     $DattoAlertUIDField = $env:DattoAlertUIDField
 
     # Connect to Azure Storage with error handling
-    try {
-        $context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey -ErrorAction Stop
-        $table = Get-StorageTable -Context $context -TableName $tableName -ErrorAction Stop
-        Write-Verbose "Successfully connected to Azure Storage"
-    }
-    catch {
-        Write-Error "Failed to connect to Azure Storage: $($_.Exception.Message)" -ErrorAction Stop
+    if ($storageAccountKey) {
+        try {
+            $context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey -ErrorAction Stop
+            $table = Get-StorageTable -Context $context -TableName $tableName -ErrorAction Stop
+            Write-Verbose "Successfully connected to Azure Storage"
+        }
+        catch {
+            Write-Warning "Failed to connect to Azure Storage: $($_.Exception.Message)"
+            Write-Warning "Storage-dependent functions may not work correctly."
+        }
+    } else {
+        Write-Verbose "Skipping Azure Storage connection due to missing credentials"
     }
 }
 catch {
@@ -1071,7 +1078,7 @@ function Send-AlertConsolidationTeamsNotification {
                 }
             }
             "disk usage" {
-                $icon = "�"
+                $icon = "[DISK]"
                 if ($OccurrenceCount -ge 5) {
                     $severity = "High"
                     $color = "attention"
