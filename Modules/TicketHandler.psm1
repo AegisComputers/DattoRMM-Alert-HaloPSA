@@ -609,7 +609,7 @@ function Update-ExistingSecurityTicket {
         # Get ticket actions separately using Get-HaloAction
         $ticketActions = @()
         try {
-            $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id
+            $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id -Count 10000
         } catch {
             Write-Warning "Failed to get actions for ticket $($ExistingTicket.id): $($_.Exception.Message)"
         }
@@ -972,7 +972,7 @@ function Update-ExistingMemoryUsageTicket {
         # Count existing occurrences in the ticket actions/notes
         $occurrenceCount = 1
         try {
-            $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id
+            $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id -Count 10000
             if ($ticketActions) {
                 $memoryUsageNotes = $ticketActions | Where-Object { $_.note -like "*Memory Usage alert*" -or $_.note -like "*memory usage*" }
                 $occurrenceCount = $memoryUsageNotes.Count + 1
@@ -1321,6 +1321,7 @@ function Send-AlertConsolidationTeamsNotification {
         Write-Host "TEAMS_NOTIFICATION_LOG: $($logEntry | ConvertTo-Json -Compress)"
         
     }
+
     catch {
         Write-Error "Failed to send Teams notification for $AlertType consolidation: $($_.Exception.Message)"
         Write-Host "Teams webhook URL: $teamsWebhookUrl"
