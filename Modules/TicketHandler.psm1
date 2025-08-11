@@ -486,7 +486,22 @@ function Find-ExistingSecurityAlert {
     }
     
     # Check if this alert type should be consolidated
-    $consolidatableTypes = Get-AlertingConfig -Path "AlertConsolidation.ConsolidatableAlertTypes" -DefaultValue @()
+    $consolidatableTypesConfig = Get-AlertingConfig -Path "AlertConsolidation.ConsolidatableAlertTypes" -DefaultValue @()
+    
+    # Ensure we have a proper array for iteration
+    $consolidatableTypes = @()
+    if ($consolidatableTypesConfig) {
+        if ($consolidatableTypesConfig -is [array]) {
+            $consolidatableTypes = $consolidatableTypesConfig
+        } elseif ($consolidatableTypesConfig -is [PSObject]) {
+            # Convert PSObject to array if needed
+            $consolidatableTypes = @($consolidatableTypesConfig.PSObject.Properties | ForEach-Object { $_.Value })
+        } else {
+            # Single item, make it an array
+            $consolidatableTypes = @($consolidatableTypesConfig)
+        }
+    }
+    
     $shouldConsolidate = $false
     foreach ($type in $consolidatableTypes) {
         if ($AlertType -like "*$type*") {
@@ -767,7 +782,22 @@ function Find-ExistingMemoryUsageAlert {
     }
     
     # Check if memory usage alerts should be consolidated
-    $consolidatableTypes = Get-AlertingConfig -Path "AlertConsolidation.ConsolidatableAlertTypes" -DefaultValue @()
+    $consolidatableTypesConfig = Get-AlertingConfig -Path "AlertConsolidation.ConsolidatableAlertTypes" -DefaultValue @()
+    
+    # Ensure we have a proper array for iteration
+    $consolidatableTypes = @()
+    if ($consolidatableTypesConfig) {
+        if ($consolidatableTypesConfig -is [array]) {
+            $consolidatableTypes = $consolidatableTypesConfig
+        } elseif ($consolidatableTypesConfig -is [PSObject]) {
+            # Convert PSObject to array if needed
+            $consolidatableTypes = @($consolidatableTypesConfig.PSObject.Properties | ForEach-Object { $_.Value })
+        } else {
+            # Single item, make it an array
+            $consolidatableTypes = @($consolidatableTypesConfig)
+        }
+    }
+    
     $shouldConsolidate = $false
     foreach ($type in $consolidatableTypes) {
         if ("Memory Usage" -like "*$type*" -or $type -like "*Memory*" -or $type -like "*memory*") {
