@@ -1044,6 +1044,30 @@ function Update-ExistingMemoryUsageTicket {
     }
 }
 
+function Get-TeamsWebhookConfig {
+    <#
+    .SYNOPSIS
+    Loads the Teams webhook configuration from teams-webhook-config.json
+    
+    .RETURNS
+    Teams webhook configuration object or null if not found
+    #>
+    try {
+        $configPath = Join-Path $PSScriptRoot "..\teams-webhook-config.json"
+        if (Test-Path $configPath) {
+            $config = Get-Content $configPath | ConvertFrom-Json
+            return $config
+        } else {
+            Write-Warning "Teams webhook config file not found at: $configPath"
+            return $null
+        }
+    }
+    catch {
+        Write-Warning "Failed to load Teams webhook configuration: $($_.Exception.Message)"
+        return $null
+    }
+}
+
 function Send-AlertConsolidationTeamsNotification {
     <#
     .SYNOPSIS
@@ -1084,7 +1108,7 @@ function Send-AlertConsolidationTeamsNotification {
     
     try {
         # Get Teams webhook URL from configuration
-        $teamsWebhookUrl = Get-AlertingConfig -Path "TeamsNotifications.WebhookUrl" -DefaultValue $null
+        $teamsWebhookUrl = Get-AlertingConfig -Path "TeamsNotifications.WebhookUrl" -DefaultValue "https://default2345c4f24d2a4b47a228dc64d28cf1.7e.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/05ade4788ca842c7a5cb380ddc46b446/triggers/manual/paths/invoke/?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Z1w5yLkMy0NCvmofz36CXtdX4SiB8FPV61mbXHzvXj4"
         
         if (-not $teamsWebhookUrl) {
             Write-Warning "Teams webhook URL not configured. Skipping Teams notification."
@@ -1370,169 +1394,8 @@ function Send-MemoryUsageTeamsNotification {
         [PSObject]$AlertWebhook
     )
     
-    try {
-        # Get Teams webhook URL from configuration
-        $teamsWebhookUrl = Get-AlertingConfig -Path "TeamsNotifications.WebhookUrl" -DefaultValue $null
-        
-        if (-not $teamsWebhookUrl) {
-            Write-Warning "Teams webhook URL not configured. Skipping Teams notification."
-            return
-        }
-        
-        # Determine severity based on memory percentage and occurrence count
-        $severity = "Medium"
-        $color = "warning" # Orange
-        
-        if ($MemoryPercentage -ge 95 -or $OccurrenceCount -ge 5) {
-            $severity = "High"
-            $color = "attention" # Red
-        } elseif ($MemoryPercentage -ge 85 -and $OccurrenceCount -ge 3) {
-            $severity = "Medium"
-            $color = "warning" # Orange
-        } else {
-            $severity = "Low"
-            $color = "good" # Green
-        }
-        
-        # Get additional context
-        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
-        $clientInfo = "Unknown Client"
-        $siteInfo = "Unknown Site"
-        
-        # Try to extract client/site info from webhook data
-        if ($AlertWebhook.dattoSiteDetails) {
-            $siteDetails = $AlertWebhook.dattoSiteDetails
-            if ($siteDetails -match "(.+)\((.+)\)") {
-                $siteInfo = $matches[1].Trim()
-                $clientInfo = $matches[2].Trim()
-            } else {
-                $siteInfo = $siteDetails
-            }
-        }
-        
-        # Create the Teams message payload using Adaptive Cards
-        $teamsPayload = @{
-            type = "message"
-            attachments = @(
-                @{
-                    contentType = "application/vnd.microsoft.card.adaptive"
-                    content = @{
-                        type = "AdaptiveCard"
-                        version = "1.4"
-                        body = @(
-                            @{
-                                type = "Container"
-                                style = $color
-                                items = @(
-                                    @{
-                                        type = "TextBlock"
-                                        text = "🚨 Memory Usage Alert Consolidation"
-                                        weight = "Bolder"
-                                        size = "Large"
-                                        color = "Light"
-                                    }
-                                )
-                            },
-                            @{
-                                type = "FactSet"
-                                facts = @(
-                                    @{
-                                        title = "Device"
-                                        value = $DeviceName
-                                    },
-                                    @{
-                                        title = "Client"
-                                        value = $clientInfo
-                                    },
-                                    @{
-                                        title = "Site"
-                                        value = $siteInfo
-                                    },
-                                    @{
-                                        title = "Current Memory Usage"
-                                        value = "$MemoryPercentage%"
-                                    },
-                                    @{
-                                        title = "Alert Count"
-                                        value = "$OccurrenceCount alerts consolidated"
-                                    },
-                                    @{
-                                        title = "Severity"
-                                        value = $severity
-                                    },
-                                    @{
-                                        title = "Ticket ID"
-                                        value = "#$TicketId"
-                                    },
-                                    @{
-                                        title = "Timestamp"
-                                        value = $timestamp
-                                    }
-                                )
-                            },
-                            @{
-                                type = "TextBlock"
-                                text = "Multiple memory usage alerts have been consolidated for device **$DeviceName**. This may indicate a persistent memory issue requiring immediate attention."
-                                wrap = $true
-                                spacing = "Medium"
-                            }
-                        )
-                        actions = @(
-                            @{
-                                type = "Action.OpenUrl"
-                                title = "View Ticket in HaloPSA"
-                                url = "$($env:HaloURL)/tickets/$TicketId"
-                            }
-                        )
-                    }
-                }
-            )
-        }
-        
-        # Convert to JSON
-        $jsonPayload = $teamsPayload | ConvertTo-Json -Depth 10 -Compress
-        
-        Write-Host "Sending Teams notification for device $DeviceName (Alert #$OccurrenceCount, $MemoryPercentage% memory usage)"
-        
-        # Send the webhook
-        $response = Invoke-RestMethod -Uri $teamsWebhookUrl -Method POST -Body $jsonPayload -ContentType "application/json" -ErrorAction Stop
-        
-        Write-Host "Teams notification sent successfully for memory usage consolidation"
-        
-        # Log the notification for monitoring
-        $logEntry = @{
-            Timestamp = $timestamp
-            Device = $DeviceName
-            Client = $clientInfo
-            Site = $siteInfo
-            MemoryPercentage = $MemoryPercentage
-            OccurrenceCount = $OccurrenceCount
-            TicketId = $TicketId
-            Severity = $severity
-            NotificationSent = $true
-        }
-        
-        Write-Host "TEAMS_NOTIFICATION_LOG: $($logEntry | ConvertTo-Json -Compress)"
-        
-    }
-    catch {
-        Write-Error "Failed to send Teams notification for memory usage consolidation: $($_.Exception.Message)"
-        Write-Host "Teams webhook URL: $teamsWebhookUrl"
-        Write-Host "Error details: $($_.Exception.ToString())"
-        
-        # Log the failure
-        $errorLogEntry = @{
-            Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-            Device = $DeviceName
-            MemoryPercentage = $MemoryPercentage
-            OccurrenceCount = $OccurrenceCount
-            TicketId = $TicketId
-            NotificationSent = $false
-            Error = $_.Exception.Message
-        }
-        
-        Write-Host "TEAMS_NOTIFICATION_ERROR: $($errorLogEntry | ConvertTo-Json -Compress)"
-    }
+    # Call the generic function with memory-specific parameters
+    Send-AlertConsolidationTeamsNotification -DeviceName $DeviceName -AlertType "Memory Usage" -AlertDetails "$MemoryPercentage% memory usage" -OccurrenceCount $OccurrenceCount -TicketId $TicketId -AlertWebhook $AlertWebhook
 }
 
 # Export the public functions
@@ -1554,6 +1417,7 @@ Export-ModuleMember -Function @(
     'Find-ExistingMemoryUsageAlert',
     'Test-MemoryUsageConsolidation',
     'Update-ExistingMemoryUsageTicket',
+    'Get-TeamsWebhookConfig',
     'Send-AlertConsolidationTeamsNotification',
     'Send-MemoryUsageTeamsNotification'
 )
