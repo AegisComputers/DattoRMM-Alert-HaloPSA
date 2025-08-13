@@ -1,7 +1,14 @@
 using namespace System.Net
 using namespace Microsoft.Azure.Cosmos.Table
 
-# Function definitions first
+# Input bindings are passed in via param block.
+param($Request, $TriggerMetadata)
+
+# Set up error handling
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
+# Function definitions
 function Get-DashboardHtml {
     return @"
 <!DOCTYPE html>
@@ -157,17 +164,7 @@ function Get-AlertDataForDashboard {
     }
 }
 
-# Input bindings are passed in via param block.
-param($Request, $TriggerMetadata)
-
-# Mock Push-OutputBinding for testing
-if (-not (Get-Command Push-OutputBinding -ErrorAction SilentlyContinue)) {
-    function Push-OutputBinding {
-        param($Name, $Value)
-        Write-Host "Response OK" -ForegroundColor Green
-    }
-}
-
+# Main execution logic
 try {
     $action = if ($Request.Params.action) { $Request.Params.action } else { 'view' }
     
