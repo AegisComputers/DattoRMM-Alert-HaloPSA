@@ -121,14 +121,6 @@ if ($Email) {
         # Safe indexing for PSObject compatibility
         $HaloAlertsReportBase = if ($ExistingAlertsReports -is [array]) { $ExistingAlertsReports[0] } else { $ExistingAlertsReports }
         Write-Host "Using existing Alerts Report with ID: $($HaloAlertsReportBase.id)"
-        
-        # Update the report to include CFDattoAlertUID if it doesn't already
-        if ($HaloAlertsReportBase.sql -notlike "*CFDattoAlertUID*") {
-            Write-Host "Updating Alerts Report to include CFDattoAlertUID field..."
-            $HaloAlertsReportBase.sql = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, CFDattoAlertUID, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
-            $null = Set-HaloReport -Report $HaloAlertsReportBase
-            Write-Host "Updated Alerts Report to include CFDattoAlertUID field"
-        }
     } else {
         $HaloAlertsReportBase = @{
             name                    = "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
