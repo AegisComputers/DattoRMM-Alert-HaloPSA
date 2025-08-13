@@ -308,10 +308,21 @@ function Get-DashboardHtml {
             // Use the correct relative URL for the API endpoint
             const apiUrl = window.location.pathname.replace('/view', '/api') + '?' + params.toString();
             console.log('API URL:', apiUrl);
+            console.log('Current pathname:', window.location.pathname);
+            
             fetch(apiUrl)
                 .then(response => {
                     console.log('Response status:', response.status);
                     console.log('Response headers:', response.headers.get('content-type'));
+                    console.log('Response URL:', response.url);
+                    
+                    // Check if we're getting HTML instead of JSON
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('text/html')) {
+                        console.error('Received HTML instead of JSON - API route not working');
+                        throw new Error('API endpoint returned HTML instead of JSON');
+                    }
+                    
                     if (!response.ok) {
                         throw new Error('HTTP error! status: ' + response.status);
                     }
@@ -616,12 +627,20 @@ function Get-SampleAlertData {
 
 # Main execution logic
 try {
-    $action = if ($Request.Params.action) { $Request.Params.action } else { 'view' }
+    # Extract action from route parameter or query string
+    $action = if ($Request.Params.action) { 
+        $Request.Params.action 
+    } elseif ($Request.Query.action) { 
+        $Request.Query.action 
+    } else { 
+        'view' 
+    }
     
     Write-Host "Alert Dashboard - Action: $action"
     Write-Host "Request URL: $($Request.Url)"
     Write-Host "Request Method: $($Request.Method)"
     Write-Host "Request Params: $($Request.Params | ConvertTo-Json -Compress)"
+    Write-Host "Request Query: $($Request.Query | ConvertTo-Json -Compress)"
     
     switch ($action.ToLower()) {
         'api' {
