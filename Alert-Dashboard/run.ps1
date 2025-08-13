@@ -347,32 +347,31 @@ function Get-DashboardHtml {
         function updateStats(stats) {
             const successRate = stats.totalAlerts > 0 ? Math.round((stats.successCount / stats.totalAlerts) * 100) : 0;
             
-            const statsHtml = `
-                <div class="stat-card info">
-                    <div class="stat-value">\${stats.totalAlerts}</div>
-                    <div class="stat-label">Total Alerts</div>
-                </div>
-                <div class="stat-card success">
-                    <div class="stat-value">\${stats.successCount}</div>
-                    <div class="stat-label">Successful</div>
-                </div>
-                <div class="stat-card error">
-                    <div class="stat-value">\${stats.errorCount}</div>
-                    <div class="stat-label">Errors</div>
-                </div>
-                <div class="stat-card warning">
-                    <div class="stat-value">\${stats.resolvedCount}</div>
-                    <div class="stat-label">Resolved</div>
-                </div>
-                <div class="stat-card info">
-                    <div class="stat-value">\${successRate}%</div>
-                    <div class="stat-label">Success Rate</div>
-                </div>
-                <div class="stat-card info">
-                    <div class="stat-value">\${stats.avgProcessingTime}s</div>
-                    <div class="stat-label">Avg Processing Time</div>
-                </div>
-            `;
+            const statsHtml = 
+                '<div class="stat-card info">' +
+                    '<div class="stat-value">' + stats.totalAlerts + '</div>' +
+                    '<div class="stat-label">Total Alerts</div>' +
+                '</div>' +
+                '<div class="stat-card success">' +
+                    '<div class="stat-value">' + stats.successCount + '</div>' +
+                    '<div class="stat-label">Successful</div>' +
+                '</div>' +
+                '<div class="stat-card error">' +
+                    '<div class="stat-value">' + stats.errorCount + '</div>' +
+                    '<div class="stat-label">Errors</div>' +
+                '</div>' +
+                '<div class="stat-card warning">' +
+                    '<div class="stat-value">' + stats.resolvedCount + '</div>' +
+                    '<div class="stat-label">Resolved</div>' +
+                '</div>' +
+                '<div class="stat-card info">' +
+                    '<div class="stat-value">' + successRate + '%</div>' +
+                    '<div class="stat-label">Success Rate</div>' +
+                '</div>' +
+                '<div class="stat-card info">' +
+                    '<div class="stat-value">' + stats.avgProcessingTime + 's</div>' +
+                    '<div class="stat-label">Avg Processing Time</div>' +
+                '</div>';
             
             document.getElementById('statsGrid').innerHTML = statsHtml;
         }
@@ -384,42 +383,40 @@ function Get-DashboardHtml {
                 return;
             }
             
-            let tableHtml = `
-                <table class="alerts-table">
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Status</th>
-                            <th>Client</th>
-                            <th>Device</th>
-                            <th>Alert Type</th>
-                            <th>Summary</th>
-                            <th>Ticket ID</th>
-                            <th>Processing Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+            let tableHtml = 
+                '<table class="alerts-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>Timestamp</th>' +
+                            '<th>Status</th>' +
+                            '<th>Client</th>' +
+                            '<th>Device</th>' +
+                            '<th>Alert Type</th>' +
+                            '<th>Summary</th>' +
+                            '<th>Ticket ID</th>' +
+                            '<th>Processing Time</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody>';
             
             alerts.forEach(alert => {
                 const statusClass = alert.status === 'success' ? 'status-success' : 'status-error';
                 const timestamp = new Date(alert.timestamp).toLocaleString();
                 const ticketLink = alert.ticketId ? 
-                    `<a href="#" style="color: #667eea; text-decoration: none;">\${alert.ticketId}</a>` : 
+                    '<a href="#" style="color: #667eea; text-decoration: none;">' + alert.ticketId + '</a>' : 
                     'N/A';
                 
-                tableHtml += `
-                    <tr>
-                        <td>\${timestamp}</td>
-                        <td><span class="status-badge \${statusClass}">\${alert.status}</span></td>
-                        <td>\${alert.client || 'N/A'}</td>
-                        <td>\${alert.device || 'N/A'}</td>
-                        <td>\${alert.alertType || 'N/A'}</td>
-                        <td title="\${alert.error || alert.summary}">\${truncateText(alert.summary || alert.error || 'N/A', 50)}</td>
-                        <td>\${ticketLink}</td>
-                        <td>\${alert.processingTimeSeconds}s</td>
-                    </tr>
-                `;
+                tableHtml += 
+                    '<tr>' +
+                        '<td>' + timestamp + '</td>' +
+                        '<td><span class="status-badge ' + statusClass + '">' + alert.status + '</span></td>' +
+                        '<td>' + (alert.client || 'N/A') + '</td>' +
+                        '<td>' + (alert.device || 'N/A') + '</td>' +
+                        '<td>' + (alert.alertType || 'N/A') + '</td>' +
+                        '<td title="' + (alert.error || alert.summary) + '">' + truncateText(alert.summary || alert.error || 'N/A', 50) + '</td>' +
+                        '<td>' + ticketLink + '</td>' +
+                        '<td>' + alert.processingTimeSeconds + 's</td>' +
+                    '</tr>';
             });
             
             tableHtml += '</tbody></table>';
@@ -447,7 +444,7 @@ function Get-DashboardHtml {
         
         function updateLastUpdated() {
             const now = new Date().toLocaleString();
-            document.getElementById('lastUpdated').textContent = `Last updated: \${now}`;
+            document.getElementById('lastUpdated').textContent = 'Last updated: ' + now;
         }
         
         function truncateText(text, maxLength) {
