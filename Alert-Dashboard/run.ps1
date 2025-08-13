@@ -306,9 +306,21 @@ function Get-DashboardHtml {
             
             console.log('Fetching data with params:', params.toString());
             // Use the correct relative URL for the API endpoint
-            const apiUrl = window.location.pathname.replace('/view', '/api') + '?' + params.toString();
-            console.log('API URL:', apiUrl);
-            console.log('Current pathname:', window.location.pathname);
+            const currentPath = window.location.pathname;
+            console.log('Current pathname:', currentPath);
+            
+            // Try different API URL approaches
+            let apiUrl;
+            if (currentPath.includes('/dashboard/view')) {
+                apiUrl = currentPath.replace('/view', '/api') + '?' + params.toString();
+            } else if (currentPath.includes('/dashboard')) {
+                apiUrl = currentPath + '/api?' + params.toString();
+            } else {
+                apiUrl = 'api?' + params.toString();
+            }
+            
+            console.log('Constructed API URL:', apiUrl);
+            console.log('Full URL will be:', window.location.origin + apiUrl);
             
             fetch(apiUrl)
                 .then(response => {
@@ -624,20 +636,25 @@ function Get-SampleAlertData {
 
 # Main execution logic
 try {
-    # Extract action from route parameter or query string
-    $action = if ($Request.Params.action) { 
+    # Extract action from route parameter - Azure Functions puts route params in $Request.Params
+    $action = if ($Request.Params -and $Request.Params.ContainsKey('action') -and $Request.Params.action) { 
         $Request.Params.action 
-    } elseif ($Request.Query.action) { 
+    } elseif ($Request.Query -and $Request.Query.ContainsKey('action') -and $Request.Query.action) { 
         $Request.Query.action 
     } else { 
-        'view' 
+        # Check if URL path contains 'api' to determine action
+        if ($Request.Url -and $Request.Url.Contains('/api')) {
+            'api'
+        } else {
+            'view'
+        }
     }
     
     Write-Host "Alert Dashboard - Action: $action"
     Write-Host "Request URL: $($Request.Url)"
     Write-Host "Request Method: $($Request.Method)"
-    Write-Host "Request Params: $($Request.Params | ConvertTo-Json -Compress)"
-    Write-Host "Request Query: $($Request.Query | ConvertTo-Json -Compress)"
+    if ($Request.Params) { Write-Host "Request Params: $($Request.Params | ConvertTo-Json -Compress)" }
+    if ($Request.Query) { Write-Host "Request Query: $($Request.Query | ConvertTo-Json -Compress)" }
     
     switch ($action.ToLower()) {
         'api' {
