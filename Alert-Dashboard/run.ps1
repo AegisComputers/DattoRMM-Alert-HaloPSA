@@ -305,10 +305,16 @@ function Get-DashboardHtml {
             });
             
             console.log('Fetching data with params:', params.toString());
-            fetch('./api?' + params.toString())
+            // Use the correct relative URL for the API endpoint
+            const apiUrl = window.location.pathname.replace('/view', '/api') + '?' + params.toString();
+            console.log('API URL:', apiUrl);
+            fetch(apiUrl)
                 .then(response => {
                     console.log('Response status:', response.status);
                     console.log('Response headers:', response.headers.get('content-type'));
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                     return response.json();
                 })
                 .then(data => {
