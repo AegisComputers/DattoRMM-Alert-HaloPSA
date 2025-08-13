@@ -622,7 +622,10 @@ try {
             $alertData = Get-AlertDataForDashboard -Request $Request
             $response = @{
                 StatusCode = [HttpStatusCode]::OK
-                Headers = @{ 'Content-Type' = 'application/json; charset=utf-8' }
+                Headers = @{ 
+                    'Content-Type' = 'application/json; charset=utf-8'
+                    'Access-Control-Allow-Origin' = '*'
+                }
                 Body = $alertData | ConvertTo-Json -Depth 10
             }
         }
@@ -631,7 +634,7 @@ try {
             $response = @{
                 StatusCode = [HttpStatusCode]::OK
                 Headers = @{ 
-                    'Content-Type' = 'text/html'
+                    'Content-Type' = 'text/html; charset=utf-8'
                 }
                 Body = $htmlContent
             }
@@ -648,8 +651,8 @@ catch {
 }
 
 # Associate values to output bindings by calling 'Push-OutputBinding'.
-Push-OutputBinding -Name Response -Value @{
+Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
     StatusCode = $response.StatusCode
     Headers = $response.Headers
     Body = $response.Body
-}
+})
