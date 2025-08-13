@@ -193,13 +193,14 @@ catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     $response = @{
         StatusCode = [HttpStatusCode]::InternalServerError
-        Headers = @{ 'Content-Type' = 'application/json; charset=utf-8' }
-        Body = @{ error = $_.Exception.Message } | ConvertTo-Json
+        Headers = @{ 'Content-Type' = 'text/html; charset=utf-8' }
+        Body = "<html><body><h1>Error</h1><p>$($_.Exception.Message)</p></body></html>"
     }
 }
 
-Push-OutputBinding -Name Response -Value @{
+# Associate values to output bindings by calling 'Push-OutputBinding'.
+Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
     StatusCode = $response.StatusCode
     Headers = $response.Headers
     Body = $response.Body
-}
+})
