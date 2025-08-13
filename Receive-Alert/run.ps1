@@ -121,10 +121,18 @@ if ($Email) {
         # Safe indexing for PSObject compatibility
         $HaloAlertsReportBase = if ($ExistingAlertsReports -is [array]) { $ExistingAlertsReports[0] } else { $ExistingAlertsReports }
         Write-Host "Using existing Alerts Report with ID: $($HaloAlertsReportBase.id)"
+        
+        # Update the report to include CFDattoAlertUID if it doesn't already
+        if ($HaloAlertsReportBase.sql -notlike "*CFDattoAlertUID*") {
+            Write-Host "Updating Alerts Report to include CFDattoAlertUID field..."
+            $HaloAlertsReportBase.sql = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, CFDattoAlertUID, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
+            $null = Set-HaloReport -Report $HaloAlertsReportBase
+            Write-Host "Updated Alerts Report to include CFDattoAlertUID field"
+        }
     } else {
         $HaloAlertsReportBase = @{
             name                    = "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
-            sql                     = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
+            sql                     = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, CFDattoAlertUID, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
             description             = "This report is used to quickly obtain alert information for use with the improved Datto RMM Alerts Function"
             type                    = 0
             datasource_id           = 0
@@ -236,86 +244,124 @@ if ($Email) {
         )
     }
 
-    # Check for existing ticket with this alert UID more efficiently
-    # Instead of getting ALL tickets, search specifically for this UID
+    # Check for existing ticket with this alert UID using the Alerts Report
     $ticketidHalo = $null
     $targetUID = $Request.Body.alertUID
     
-    # Try to find existing ticket by searching for the alert UID
+    Write-Host "Searching for existing ticket with Alert UID: $targetUID"
+    
+    # Use the Alerts Report to find tickets with matching CFDattoAlertUID
     try {
-        # Search for tickets containing the alert UID in a more targeted way
-        $existingTickets = Get-HaloTicket -Search $targetUID -OpenOnly
+        $alertsFromReport = Invoke-HaloReport -Report $HaloAlertsReportBase -IncludeReport
+        Write-Host "Retrieved $($alertsFromReport.Count) alerts from report for UID search"
         
-        if ($existingTickets) {
-            foreach ($ticket in $existingTickets) {
-                # Get full details only for potential matches to check custom fields
-                $fullTicket = Get-HaloTicket -TicketID $ticket.id -IncludeDetails
-                $customFields = $fullTicket.customfields
-                $dattoAlertUIDField = $customFields | Where-Object { $_.name -eq 'CFDattoAlertUID' }
-                
-                if ($dattoAlertUIDField -and $dattoAlertUIDField.value -eq $targetUID) {
-                    Write-Output "Found matching ticket: ID is $($ticket.id)"
-                    $ticketidHalo = $ticket.id
-                    $dateArrival = (get-date((get-date).AddMinutes(-5)))
-                    $dateEnd = (get-date) 
-                    Write-Output "Date Arrival $($dateArrival) and end $($dateEnd)"
-                    
-                    $ActionUpdate = @{
-                        ticket_id         = $ticket.id
-                        actionid          = 23
-                        outcome           = "Remote"
-                        outcome_id        = 23
-                        note              = "Resolved by Datto Automation"
-                        actionarrivaldate = $dateArrival
-                        actioncompletiondate = $dateEnd
-                        action_isresponse = $false
-                        validate_response = $false
-                        sendemail         = $false
-                    }
-                    $Null = New-HaloAction -Action $ActionUpdate
-                    Write-Host "Adding ticket entry $ActionUpdate"
-                    break # Found our ticket, no need to continue
-                }
+        # Find tickets with matching CFDattoAlertUID that are still open (not status 9)
+        $matchingAlert = $alertsFromReport | Where-Object { 
+            $_.CFDattoAlertUID -eq $targetUID -and $_.tstatusdesc -ne "Closed"
+        }
+        
+        if ($matchingAlert) {
+            $ticketidHalo = $matchingAlert.Faultid
+            Write-Host "Found matching open ticket with ID: $ticketidHalo (Status: $($matchingAlert.tstatusdesc))"
+            
+            # Add the "Resolved by Datto Automation" action
+            $dateArrival = (Get-Date).AddMinutes(-5)
+            $dateEnd = Get-Date
+            Write-Host "Adding resolution action - Arrival: $dateArrival, End: $dateEnd"
+            
+            $ActionUpdate = @{
+                ticket_id            = $ticketidHalo
+                actionid             = 23
+                outcome              = "Remote"
+                outcome_id           = 23
+                note                 = "Resolved by Datto Automation"
+                actionarrivaldate    = $dateArrival
+                actioncompletiondate = $dateEnd
+                action_isresponse    = $false
+                validate_response    = $false
+                sendemail            = $false
+            }
+            
+            try {
+                $actionResult = New-HaloAction -Action $ActionUpdate
+                Write-Host "Successfully added resolution action to ticket $ticketidHalo"
+            } catch {
+                Write-Host "ERROR adding resolution action to ticket $ticketidHalo`: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "No matching open ticket found for Alert UID: $targetUID"
+            
+            # Check if there's a closed ticket with this UID for informational purposes
+            $closedAlert = $alertsFromReport | Where-Object { $_.CFDattoAlertUID -eq $targetUID }
+            if ($closedAlert) {
+                Write-Host "Found closed ticket with this UID: $($closedAlert.Faultid) (Status: $($closedAlert.tstatusdesc))"
             }
         }
-    }
-    catch {
-        Write-Warning "Error searching for existing tickets: $($_.Exception.Message)"
+    } catch {
+        Write-Host "ERROR searching for existing tickets using report: $($_.Exception.Message)" -ForegroundColor Red
         # Continue processing normally if search fails
     }
     
     if ($Request.Body.resolvedAlert -eq "true") {
-        Write-Host "Resolved Closing $ticketidHalo"
-        if ($null -ne $ticketidHalo){
+        Write-Host "Processing resolved alert for UID: $targetUID"
+        
+        if ($null -ne $ticketidHalo) {
+            Write-Host "Closing ticket ID: $ticketidHalo"
             $TicketID = $ticketidHalo
         
+            # Close the ticket
             $TicketUpdate = @{
                 id        = $TicketID 
                 status_id = 9
-                agent_id  = 38
+                agent_id  = 1
             }
-            $null = Set-HaloTicket -Ticket $TicketUpdate
+            
+            try {
+                Set-HaloTicket -Ticket $TicketUpdate
+                Write-Host "Successfully closed ticket $TicketID"
+            } catch {
+                Write-Host "ERROR closing ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
+            }
 
-            $Actions = Get-HaloAction -TicketID $TicketID
+            # Mark all actions as reviewed
+            try {
+                $Actions = Get-HaloAction -TicketID $TicketID -Count 10000
+                Write-Host "Retrieved $($Actions.Count) actions to mark as reviewed for ticket $TicketID"
 
-            # Mass review logic
-            foreach ($action in $actions) {
-               $ReviewData = @{
-                   ticket_id = $action.ticket_id
-                   id = $action.id
-                   actreviewed = "true"
+                # Mass review logic
+                foreach ($action in $actions) {
+                   $ReviewData = @{
+                       ticket_id = $action.ticket_id
+                       id = $action.id
+                       actreviewed = "true"
+                    }
+                    try {
+                        Set-HaloAction -Action $ReviewData
+                    } catch {
+                        Write-Host "WARNING: Failed to mark action $($action.id) as reviewed: $($_.Exception.Message)" -ForegroundColor Yellow
+                    }
                 }
-                Set-HaloAction -Action $ReviewData
+                Write-Host "Completed marking actions as reviewed for ticket $TicketID"
+            } catch {
+                Write-Host "ERROR marking actions as reviewed for ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
             }
 
-            $dateInvoice = (get-date)
-            $invoice = @{ 
-                client_id = $HaloClientDattoMatch
-                invoice_date = $dateInvoice
-                lines = @(@{entity_type = "labour";ticket_id = $TicketID})
-            }
+            # Create invoice
+            try {
+                $dateInvoice = Get-Date
+                $invoice = @{ 
+                    client_id = $HaloClientDattoMatch
+                    invoice_date = $dateInvoice
+                    lines = @(@{entity_type = "labour"; ticket_id = $TicketID})
+                }
 
-            $null = New-HaloInvoice -Invoice $invoice 
+                $null = New-HaloInvoice -Invoice $invoice 
+                Write-Host "Successfully created invoice for ticket $TicketID and client $HaloClientDattoMatch"
+            } catch {
+                Write-Host "ERROR creating invoice for ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "No ticket ID found to close for resolved alert UID: $targetUID" -ForegroundColor Yellow
         }
         
     } else {
