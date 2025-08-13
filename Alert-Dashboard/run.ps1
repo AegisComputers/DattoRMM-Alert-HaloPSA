@@ -183,7 +183,9 @@ try {
             $htmlContent = Get-DashboardHtml
             $response = @{
                 StatusCode = [HttpStatusCode]::OK
-                Headers = @{ 'Content-Type' = 'text/html; charset=utf-8' }
+                Headers = @{ 
+                    'Content-Type' = 'text/html'
+                }
                 Body = $htmlContent
             }
         }
@@ -199,8 +201,8 @@ catch {
 }
 
 # Associate values to output bindings by calling 'Push-OutputBinding'.
-Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+Push-OutputBinding -Name Response -Value @{
     StatusCode = $response.StatusCode
-    Headers = $response.Headers
+    ContentType = 'text/html'
     Body = $response.Body
-})
+}
