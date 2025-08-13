@@ -304,9 +304,15 @@ function Get-DashboardHtml {
                 client: clientFilter
             });
             
-            fetch('api?' + params.toString())
-                .then(response => response.json())
+            console.log('Fetching data with params:', params.toString());
+            fetch('./api?' + params.toString())
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', response.headers.get('content-type'));
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Received data:', data);
                     updateStats(data.stats);
                     updateAlertsTable(data.alerts);
                     updateClientFilter(data.alerts);
@@ -607,6 +613,9 @@ try {
     $action = if ($Request.Params.action) { $Request.Params.action } else { 'view' }
     
     Write-Host "Alert Dashboard - Action: $action"
+    Write-Host "Request URL: $($Request.Url)"
+    Write-Host "Request Method: $($Request.Method)"
+    Write-Host "Request Params: $($Request.Params | ConvertTo-Json -Compress)"
     
     switch ($action.ToLower()) {
         'api' {
