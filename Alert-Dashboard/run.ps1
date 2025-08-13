@@ -304,7 +304,7 @@ function Get-DashboardHtml {
                 client: clientFilter
             });
             
-            fetch(`api?` + params.toString())
+            fetch('api?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
                     updateStats(data.stats);
@@ -641,6 +641,6 @@ catch {
 # Associate values to output bindings by calling 'Push-OutputBinding'.
 Push-OutputBinding -Name Response -Value @{
     StatusCode = $response.StatusCode
-    ContentType = 'text/html'
+    Headers = $response.Headers
     Body = $response.Body
 }
