@@ -9,7 +9,7 @@
     Description = 'Core helper functions for DattoRMM alert processing and Halo integration'
     
     # PowerShell version requirements
-    PowerShellVersion = '7.2'
+    PowerShellVersion = '7.0'
     
     # Required modules
     RequiredModules = @(

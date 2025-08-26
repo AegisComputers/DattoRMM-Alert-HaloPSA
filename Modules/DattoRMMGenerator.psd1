@@ -9,7 +9,7 @@
     Description = 'DattoRMM alert content generation and formatting functions'
     
     # PowerShell version requirements
-    PowerShellVersion = '7.2'
+    PowerShellVersion = '7.0'
     
     # Required modules
     RequiredModules = @(

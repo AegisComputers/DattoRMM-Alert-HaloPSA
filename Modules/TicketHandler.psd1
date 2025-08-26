@@ -28,7 +28,7 @@
     Description = 'Handles ticket processing and alert management for DattoRMM-HaloPSA integration'
 
     # Minimum version of the PowerShell engine required by this module
-    PowerShellVersion = '7.2'
+    PowerShellVersion = '7.0'
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry
     FunctionsToExport = @(

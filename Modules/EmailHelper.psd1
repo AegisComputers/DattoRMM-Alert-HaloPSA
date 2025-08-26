@@ -26,7 +26,7 @@ Copyright = '(c) 2024 Oliver Perring. All rights reserved.'
 Description = 'This module, HaloHelper, provides enhanced email handling and response functionalities for Halo services.'
 
 # Minimum version of the Windows PowerShell engine required by this module.
-PowerShellVersion = '7.2'
+PowerShellVersion = '7.0'
 
 # Functions to export from this module.
 FunctionsToExport = @('Get-HaloUserEmail', 'Send-HaloEmailResponse', 'Send-HaloUserResponse')

@@ -64,12 +64,18 @@ try {
     Write-Warning "Error initializing configuration: $_"
 }
 
-#Installed Modules
-Import-module DattoRMM
-Import-Module HaloAPI
-Import-Module Az.Accounts
-Import-Module Az.Storage
-Import-Module AzTable
+#Installed Modules - Import with error handling
+$requiredModules = @('DattoRMM', 'HaloAPI', 'Az.Accounts', 'Az.Storage', 'AzTable')
+
+foreach ($moduleName in $requiredModules) {
+    try {
+        Import-Module $moduleName -Force -ErrorAction Stop
+        Write-Host "Module $moduleName imported successfully."
+    } catch {
+        Write-Warning "Failed to import module $moduleName. Error: $_"
+        Write-Host "Module $moduleName may not be available yet. Functions will continue with limited functionality."
+    }
+}
 
 # Log the end time for reference
 $coldEndTime = Get-Date

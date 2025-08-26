@@ -1,5 +1,6 @@
 @{
-    # Module metadata
+    #     # PowerShell version requirements
+    PowerShellVersion = '7.0'dule metadata
     RootModule = 'ConfigurationManager.psm1'
     ModuleVersion = '1.0.0'
     GUID = 'c3d4e5f6-a7b8-9012-3456-789012cdefab'

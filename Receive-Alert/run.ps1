@@ -51,7 +51,19 @@ $paramsDatto = @{
    SecretKey = $DattoSecretKey
 }
 
-Set-DrmmApiParameters @paramsDatto
+# Check if DattoRMM module is available before setting parameters
+try {
+    if (Get-Command Set-DrmmApiParameters -ErrorAction SilentlyContinue) {
+        Set-DrmmApiParameters @paramsDatto
+        Write-Host "Datto RMM API parameters set successfully"
+    } else {
+        Write-Warning "DattoRMM module not available. Set-DrmmApiParameters command not found."
+        throw "DattoRMM module is required but not loaded. Please check requirements.psd1 and module installation."
+    }
+} catch {
+    Write-Error "Failed to configure DattoRMM API: $($_.Exception.Message)"
+    throw
+}
 
 # Get configuration values for potential future use
 # $SetTicketResponded = Get-AlertingConfig -Path "TicketDefaults.SetTicketResponded" -DefaultValue $true
