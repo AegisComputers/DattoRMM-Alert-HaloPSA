@@ -9,7 +9,7 @@
     Description = 'Configuration management functions for DattoRMM-HaloPSA alert integration'
     
     # PowerShell version requirements
-    PowerShellVersion = '5.1'
+    PowerShellVersion = '7.2'
     
     # Required modules
     RequiredModules = @()

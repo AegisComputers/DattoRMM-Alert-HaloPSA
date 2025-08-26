@@ -9,7 +9,7 @@
     Description = 'Helper functions for HaloPSA integration and client/site matching'
     
     # PowerShell version requirements
-    PowerShellVersion = '5.1'
+    PowerShellVersion = '7.2'
     
     # Required modules
     RequiredModules = @(
