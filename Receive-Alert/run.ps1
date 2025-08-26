@@ -32,97 +32,97 @@ try {
     $HaloClientSecret = $env:HaloClientSecret
     $HaloURL = $env:HaloURL
     $HaloTicketStatusID = $env:HaloTicketStatusID
-$HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
-$HaloTicketType = $env:HaloTicketType
-$HaloReocurringStatus = $env:HaloReocurringStatus
+    $HaloCustomAlertTypeField = $env:HaloCustomAlertTypeField
+    $HaloTicketType = $env:HaloTicketType
+    $HaloReocurringStatus = $env:HaloReocurringStatus
 
-#AZStorageVars
-$tableName = Get-AlertingConfig -Path "Storage.TableName" -DefaultValue "DevicePatchAlerts"
+    #AZStorageVars
+    $tableName = Get-AlertingConfig -Path "Storage.TableName" -DefaultValue "DevicePatchAlerts"
 
-#Datto Vars
-$DattoURL = $env:DattoURL
-$DattoKey = $env:DattoKey
-$DattoSecretKey = $env:DattoSecretKey
-$DattoAlertUIDField = $env:DattoAlertUIDField
+    #Datto Vars
+    $DattoURL = $env:DattoURL
+    $DattoKey = $env:DattoKey
+    $DattoSecretKey = $env:DattoSecretKey
+    $DattoAlertUIDField = $env:DattoAlertUIDField
 
-$paramsDatto = @{
-   Url       = $DattoURL
-   Key       = $DattoKey
-   SecretKey = $DattoSecretKey
-}
-
-# Check if DattoRMM module is available before setting parameters
-try {
-    if (Get-Command Set-DrmmApiParameters -ErrorAction SilentlyContinue) {
-        Set-DrmmApiParameters @paramsDatto
-        Write-Host "Datto RMM API parameters set successfully"
-    } else {
-        Write-Warning "DattoRMM module not available. Set-DrmmApiParameters command not found."
-        throw "DattoRMM module is required but not loaded. Please check requirements.psd1 and module installation."
+    $paramsDatto = @{
+       Url       = $DattoURL
+       Key       = $DattoKey
+       SecretKey = $DattoSecretKey
     }
-} catch {
-    Write-Error "Failed to configure DattoRMM API: $($_.Exception.Message)"
-    throw
-}
 
-# Get configuration values for potential future use
-# $SetTicketResponded = Get-AlertingConfig -Path "TicketDefaults.SetTicketResponded" -DefaultValue $true
-# $RelatedAlertMinutes = Get-AlertingConfig -Path "AlertThresholds.RelatedAlertWindowMinutes" -DefaultValue 5
-# $ReoccurringTicketHours = Get-AlertingConfig -Path "AlertThresholds.ReoccurringTicketHours" -DefaultValue 24
-# $HaloAlertHistoryDays = Get-AlertingConfig -Path "AlertThresholds.HaloAlertHistoryDays" -DefaultValue 30
-
-#Priority Mapping from configuration - ensure it's a proper hashtable
-$PriorityMapConfig = Get-AlertingConfig -Path "PriorityMapping" -DefaultValue @{
-    "Critical"    = "4"
-    "High"        = "4"
-    "Moderate"    = "4"
-    "Low"         = "4"
-    "Information" = "4"
-}
-
-# Convert to proper hashtable if it's a PSObject
-if ($PriorityMapConfig -is [PSObject] -and $PriorityMapConfig -isnot [hashtable]) {
-    $PriorityHaloMap = @{}
-    $PriorityMapConfig.PSObject.Properties | ForEach-Object {
-        $PriorityHaloMap[$_.Name] = $_.Value
-    }
-} else {
-    $PriorityHaloMap = $PriorityMapConfig
-}
-
-#AlertWebhook Body
-$AlertWebhook = $Request.Body
-
-$Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
-$emailTime = Get-Date
-Write-Host "Email generation took: $((New-TimeSpan -Start $startTime -End $emailTime).TotalSeconds) seconds"
-
-if ($Email) {
-    $Alert = $Email.Alert
-
-    #Connect to the halo api with the env vars
-    Connect-HaloAPI -URL $HaloURL -ClientId $HaloClientID -ClientSecret $HaloClientSecret -Scopes "all"
-    $haloConnectTime = Get-Date
-    Write-Host "Halo API connection took: $((New-TimeSpan -Start $emailTime -End $haloConnectTime).TotalSeconds) seconds"
-    
-    # Check if Device Report already exists, if not create it
-    $ExistingDeviceReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Device Report"
-    if ($ExistingDeviceReports -and $ExistingDeviceReports.Count -gt 0) {
-        # Safe indexing for PSObject compatibility
-        $HaloDeviceReport = if ($ExistingDeviceReports -is [array]) { $ExistingDeviceReports[0] } else { $ExistingDeviceReports }
-        Write-Host "Using existing Device Report with ID: $($HaloDeviceReport.id)"
-    } else {
-        $HaloDeviceReport = @{
-            name                    = "Datto RMM Improved Alerts PowerShell Function - Device Report"
-            sql                     = "Select did, Dsite, DDattoID, DDattoAlternateId from device"
-            description             = "This report is used to quickly obtain device mapping information for use with the improved Datto RMM Alerts Function"
-            type                    = 0
-            datasource_id           = 0
-            canbeaccessedbyallusers = $false
+    # Check if DattoRMM module is available before setting parameters
+    try {
+        if (Get-Command Set-DrmmApiParameters -ErrorAction SilentlyContinue) {
+            Set-DrmmApiParameters @paramsDatto
+            Write-Host "Datto RMM API parameters set successfully"
+        } else {
+            Write-Warning "DattoRMM module not available. Set-DrmmApiParameters command not found."
+            throw "DattoRMM module is required but not loaded. Please check requirements.psd1 and module installation."
         }
-        $HaloDeviceReport = New-HaloReport -Report $HaloDeviceReport
-        Write-Host "Created new Device Report with ID: $($HaloDeviceReport.id)"
+    } catch {
+        Write-Error "Failed to configure DattoRMM API: $($_.Exception.Message)"
+        throw
     }
+
+    # Get configuration values for potential future use
+    # $SetTicketResponded = Get-AlertingConfig -Path "TicketDefaults.SetTicketResponded" -DefaultValue $true
+    # $RelatedAlertMinutes = Get-AlertingConfig -Path "AlertThresholds.RelatedAlertWindowMinutes" -DefaultValue 5
+    # $ReoccurringTicketHours = Get-AlertingConfig -Path "AlertThresholds.ReoccurringTicketHours" -DefaultValue 24
+    # $HaloAlertHistoryDays = Get-AlertingConfig -Path "AlertThresholds.HaloAlertHistoryDays" -DefaultValue 30
+
+    #Priority Mapping from configuration - ensure it's a proper hashtable
+    $PriorityMapConfig = Get-AlertingConfig -Path "PriorityMapping" -DefaultValue @{
+        "Critical"    = "4"
+        "High"        = "4"
+        "Moderate"    = "4"
+        "Low"         = "4"
+        "Information" = "4"
+    }
+
+    # Convert to proper hashtable if it's a PSObject
+    if ($PriorityMapConfig -is [PSObject] -and $PriorityMapConfig -isnot [hashtable]) {
+        $PriorityHaloMap = @{}
+        $PriorityMapConfig.PSObject.Properties | ForEach-Object {
+            $PriorityHaloMap[$_.Name] = $_.Value
+        }
+    } else {
+        $PriorityHaloMap = $PriorityMapConfig
+    }
+
+    #AlertWebhook Body
+    $AlertWebhook = $Request.Body
+
+    $Email = Get-AlertEmailBody -AlertWebhook $AlertWebhook
+    $emailTime = Get-Date
+    Write-Host "Email generation took: $((New-TimeSpan -Start $startTime -End $emailTime).TotalSeconds) seconds"
+
+    if ($Email) {
+        $Alert = $Email.Alert
+
+        #Connect to the halo api with the env vars
+        Connect-HaloAPI -URL $HaloURL -ClientId $HaloClientID -ClientSecret $HaloClientSecret -Scopes "all"
+        $haloConnectTime = Get-Date
+        Write-Host "Halo API connection took: $((New-TimeSpan -Start $emailTime -End $haloConnectTime).TotalSeconds) seconds"
+        
+        # Check if Device Report already exists, if not create it
+        $ExistingDeviceReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Device Report"
+        if ($ExistingDeviceReports -and $ExistingDeviceReports.Count -gt 0) {
+            # Safe indexing for PSObject compatibility
+            $HaloDeviceReport = if ($ExistingDeviceReports -is [array]) { $ExistingDeviceReports[0] } else { $ExistingDeviceReports }
+            Write-Host "Using existing Device Report with ID: $($HaloDeviceReport.id)"
+        } else {
+            $HaloDeviceReport = @{
+                name                    = "Datto RMM Improved Alerts PowerShell Function - Device Report"
+                sql                     = "Select did, Dsite, DDattoID, DDattoAlternateId from device"
+                description             = "This report is used to quickly obtain device mapping information for use with the improved Datto RMM Alerts Function"
+                type                    = 0
+                datasource_id           = 0
+                canbeaccessedbyallusers = $false
+            }
+            $HaloDeviceReport = New-HaloReport -Report $HaloDeviceReport
+            Write-Host "Created new Device Report with ID: $($HaloDeviceReport.id)"
+        }
     $ParsedAlertType = Get-AlertHaloType -Alert $Alert -AlertMessage $AlertWebhook.alertMessage
 
     $HaloDevice = Invoke-HaloReport -Report $HaloDeviceReport -IncludeReport | where-object { $_.DDattoID -eq $Alert.alertSourceInfo.deviceUid }
@@ -420,7 +420,7 @@ if ($Email) {
         Body       = "Alert processed successfully"
     }
     
-} else {
+    } else {
         Write-Host "No alert found. This webhook shouldn't be triggered this way except when testing!!!!"
         $endTime = Get-Date
         $totalDuration = New-TimeSpan -Start $startTime -End $endTime
@@ -431,7 +431,7 @@ if ($Email) {
             StatusCode = [HttpStatusCode]::BadRequest
             Body       = "No alert found in request"
         }
-}
+    }
 }
 catch {
     $endTime = Get-Date
