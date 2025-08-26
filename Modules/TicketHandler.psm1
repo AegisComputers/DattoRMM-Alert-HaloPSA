@@ -532,9 +532,11 @@ function Find-ExistingSecurityAlert {
         # Using -SearchSummary instead of -Search to work around API bug with device names ending in numbers
         $searchResults = Get-HaloTicket -SearchSummary "Device: $DeviceName" -OpenOnly -FullObjects
         
-        Write-Host "Search returned $($searchResults.Count) open tickets for device: $DeviceName"
+        # Safely handle search results count
+        $resultCount = if ($searchResults -and $searchResults.Count) { $searchResults.Count } else { 0 }
+        Write-Host "Search returned $resultCount open tickets for device: $DeviceName"
         
-        if ($searchResults -and $searchResults.Count -gt 0) {
+        if ($searchResults -and $resultCount -gt 0) {
             # Filter results by alert type - no need to check status since -OpenOnly guarantees open tickets
             # No need to check date since open tickets are still relevant for consolidation
             $matchingTickets = @()
@@ -617,9 +619,16 @@ function Update-ExistingSecurityTicket {
         # Find consolidation notes
         $consolidationNotes = @()
         if ($ticketActions) {
-            $consolidationNotes = $ticketActions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" }
+            $consolidationNotes = @($ticketActions | Where-Object { $_.note -like "*Additional $AlertType alert detected*" })
         }
-        $currentCount = $consolidationNotes.Count + 1 # +1 for the original ticket
+        
+        # Safely get count - ensure we always have a valid count
+        $consolidationCount = if ($consolidationNotes -and $consolidationNotes.Count) { 
+            $consolidationNotes.Count 
+        } else { 
+            0 
+        }
+        $currentCount = $consolidationCount + 1 # +1 for the original ticket
         
         if ($currentCount -ge $maxCount) {
             Write-Warning "Maximum consolidation count ($maxCount) reached for ticket $($ExistingTicket.id). Creating new ticket instead."
@@ -828,9 +837,11 @@ function Find-ExistingMemoryUsageAlert {
         # Search for tickets with memory usage pattern for this device
         $searchResults = Get-HaloTicket -SearchSummary "Device: $DeviceName" -OpenOnly -FullObjects
         
-        Write-Host "Search returned $($searchResults.Count) open tickets for device: $DeviceName"
+        # Safely handle search results count
+        $resultCount = if ($searchResults -and $searchResults.Count) { $searchResults.Count } else { 0 }
+        Write-Host "Search returned $resultCount open tickets for device: $DeviceName"
         
-        if ($searchResults -and $searchResults.Count -gt 0) {
+        if ($searchResults -and $resultCount -gt 0) {
             $matchingTickets = @()
             
             foreach ($ticket in $searchResults) {
@@ -974,8 +985,15 @@ function Update-ExistingMemoryUsageTicket {
         try {
             $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id -Count 10000
             if ($ticketActions) {
-                $memoryUsageNotes = $ticketActions | Where-Object { $_.note -like "*Memory Usage alert*" -or $_.note -like "*memory usage*" }
-                $occurrenceCount = $memoryUsageNotes.Count + 1
+                $memoryUsageNotes = @($ticketActions | Where-Object { $_.note -like "*Memory Usage alert*" -or $_.note -like "*memory usage*" })
+                
+                # Safely get count - ensure we always have a valid count
+                $memoryUsageCount = if ($memoryUsageNotes -and $memoryUsageNotes.Count) { 
+                    $memoryUsageNotes.Count 
+                } else { 
+                    0 
+                }
+                $occurrenceCount = $memoryUsageCount + 1
             }
         } catch {
             Write-Warning "Failed to get actions for memory consolidation ticket $($ExistingTicket.id): $($_.Exception.Message)"
