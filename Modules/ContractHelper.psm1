@@ -30,23 +30,41 @@ function Get-DeviceTypeFromAlert {
     )
     
     try {
-        # PRIORITY 1: Trust Datto's deviceType field
-        # Datto provides: "Server", "Desktop", "Laptop", "Workstation"
-        if ($DattoDevice.deviceType -and $DattoDevice.deviceType.Trim() -ne "") {
-            $deviceType = $DattoDevice.deviceType.Trim()
+        # PRIORITY 1: Trust Datto's deviceType.category field
+        # Datto structure: $device.deviceType.category = "Server", "Laptop", "Desktop", "Workstation"
+        #                  $device.deviceType.type = "Main System Chassis", etc.
+        $deviceTypeCategory = $null
+        
+        # Handle both full device object and simplified hashtable
+        if ($DattoDevice.deviceType) {
+            if ($DattoDevice.deviceType -is [string]) {
+                # Simple string (from alert webhook)
+                $deviceTypeCategory = $DattoDevice.deviceType.Trim()
+            }
+            elseif ($DattoDevice.deviceType.category) {
+                # Nested object from Get-DrmmDevice or Get-DrmmSiteDevices
+                $deviceTypeCategory = $DattoDevice.deviceType.category.Trim()
+            }
+        }
+        
+        if ($deviceTypeCategory -and $deviceTypeCategory -ne "") {
+            Write-Host "Datto deviceType.category: $deviceTypeCategory"
             
             # Map Datto device types to our categories
-            if ($deviceType -eq "Server") {
-                Write-Host "Device identified as Server (Datto Type: $deviceType)"
+            if ($deviceTypeCategory -eq "Server") {
+                Write-Host "Device identified as Server (Datto Category: $deviceTypeCategory)"
                 return "Server"
             }
-            elseif ($deviceType -match "^(Desktop|Laptop|Workstation)$") {
-                Write-Host "Device identified as PC (Datto Type: $deviceType)"
+            elseif ($deviceTypeCategory -match "^(Desktop|Laptop|Workstation)$") {
+                Write-Host "Device identified as PC (Datto Category: $deviceTypeCategory)"
                 return "PC"
             }
             else {
-                Write-Host "Unknown Datto device type '$deviceType', will try hostname pattern matching"
+                Write-Host "Unknown Datto device category '$deviceTypeCategory', will try hostname pattern matching"
             }
+        }
+        else {
+            Write-Host "No deviceType.category found, will try hostname pattern matching"
         }
         
         # PRIORITY 2: Fallback to hostname patterns (with word boundaries to avoid false matches)
