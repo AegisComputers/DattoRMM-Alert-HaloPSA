@@ -127,6 +127,14 @@ try {
 
     $HaloDevice = Invoke-HaloReport -Report $HaloDeviceReport -IncludeReport | where-object { $_.DDattoID -eq $Alert.alertSourceInfo.deviceUid }
 
+    # Create DattoDevice object for contract validation from alert data
+    $DattoDevice = @{
+        deviceUid  = $Alert.alertSourceInfo.deviceUid
+        deviceType = $Alert.alertSourceInfo.deviceType
+        hostname   = $Alert.alertSourceInfo.deviceName
+    }
+    Write-Host "Datto Device Info - UID: $($DattoDevice.deviceUid), Type: $($DattoDevice.deviceType), Hostname: $($DattoDevice.hostname)"
+
     # Check if Alerts Report already exists, if not create it
     $ExistingAlertsReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
     if ($ExistingAlertsReports -and $ExistingAlertsReports.Count -gt 0) {
@@ -201,9 +209,9 @@ try {
     
     Write-Host "Client ID in Halo - $($HaloClientDattoMatch)"
     
-    # Optimize contract retrieval - only get what we need
+    # Retrieve contracts with full objects to get custom fields (CFDevicesSupported)
     try {
-        $Contracts = Get-HaloContract -ClientID $HaloClientDattoMatch
+        $Contracts = Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects
         Write-Host "Contracts for client ID - $($Contracts.Count) contracts found"
     }
     catch {
@@ -212,22 +220,27 @@ try {
         $Contracts = @()
     }
 
-    $FilteredContracts = $Contracts | Where-Object { #Internal work ref to stop false contracts selection from Halo when finishing internal alerts 
-        ($_.ref -like '*M' -and $_.site_id -eq $HaloSiteIDDatto) -or
-		($_.ref -like 'InternalWork' -and $_.site_id -eq $HaloSiteIDDatto)
-    }
-
-    # Sort the filtered contracts by 'start_date' in descending order
-    $LatestContract = $FilteredContracts | Sort-Object start_date -Descending | Select-Object -First 1
-
-    # Extract and display the ID of the latest contract based on the start date
-    $LatestContractId = $LatestContract.id
-
-    Write-Host "The latest contract is - $($LatestContract) with an id of $($LatestContract.id)" 
+    # === NEW: Contract-based Ticket Type Assignment ===
+    # Determine ticket type and charge rate based on contract eligibility and device type
+    $contractDecision = Get-ContractTicketingDecision `
+        -Contracts $Contracts `
+        -HaloSiteID $HaloSiteIDDatto `
+        -DattoDevice $DattoDevice `
+        -ClientID $HaloClientDattoMatch `
+        -ContractTicketTypeId (Get-AlertingConfig -Path "ContractManagement.ContractTicketTypeId" -DefaultValue 8) `
+        -NonContractTicketTypeId (Get-AlertingConfig -Path "ContractManagement.NonContractTicketTypeId" -DefaultValue 9)
+    
+    Write-Host "Contract Decision Summary:"
+    Write-Host "  Device Type: $($contractDecision.DeviceType)"
+    Write-Host "  Contract Found: $(if($contractDecision.ContractId){"Yes - $($contractDecision.ContractRef)"}else{"No"})"
+    Write-Host "  Device Eligible: $($contractDecision.IsEligible)"
+    Write-Host "  Ticket Type ID: $($contractDecision.TicketTypeId)"
+    Write-Host "  Charge Rate: $(if($null -eq $contractDecision.ChargeRate){'Use Contract Rate'}else{$contractDecision.ChargeRate})"
+    Write-Host "  Reason: $($contractDecision.Reason)"
 
     $HaloTicketCreate = @{
         summary          = $TicketSubject
-        tickettype_id    = Get-AlertingConfig -Path "TicketDefaults.TicketTypeId" -DefaultValue 8
+        tickettype_id    = $contractDecision.TicketTypeId  # Dynamic based on contract eligibility
         details_html     = $HtmlBody
         DattoAlertState  = 0
         site_id          = $HaloSiteIDDatto
@@ -235,7 +248,6 @@ try {
         priority_id      = $HaloPriority
         status_id        = $HaloTicketStatusID
         category_1       = Get-AlertingConfig -Path "TicketDefaults.Category1" -DefaultValue "Datto Alert"
-        contract_id      = $LatestContractId
         customfields     = @(
             @{
                 id    = $HaloCustomAlertTypeField
@@ -247,6 +259,18 @@ try {
             }
         )
     }
+    
+    # Only add contract_id if it's not null (for eligible devices)
+    if ($contractDecision.ContractId) {
+        $HaloTicketCreate.contract_id = $contractDecision.ContractId
+        Write-Host "Adding contract ID $($contractDecision.ContractId) to ticket"
+    }
+    else {
+        Write-Host "No contract ID added (non-contract ticket)"
+    }
+    
+    # Store contract decision for later use (e.g., in action creation)
+    $script:ContractDecision = $contractDecision
 
     # Check for existing ticket with this alert UID using the Alerts Report
     $ticketidHalo = $null
@@ -273,6 +297,7 @@ try {
             $dateEnd = Get-Date
             Write-Host "Adding resolution action - Arrival: $dateArrival, End: $dateEnd"
             
+            # Build action with appropriate charge rate
             $ActionUpdate = @{
                 ticket_id            = $ticketidHalo
                 actionid             = 23
@@ -286,8 +311,23 @@ try {
                 sendemail            = $false
             }
             
+            # Apply charge rate if this is a non-contract ticket
+            # Check if we have the contract decision from ticket creation
+            if ($script:ContractDecision -and $script:ContractDecision.ChargeRate -eq 0) {
+                $ActionUpdate.chargerate = 0
+                Write-Host "Applied charge rate 0 (non-contract ticket)"
+            }
+            elseif ($script:ContractDecision -and $script:ContractDecision.TicketTypeId -ne 8) {
+                # Non-contract ticket type - apply no charge
+                $ActionUpdate.chargerate = 0
+                Write-Host "Applied charge rate 0 (non-contract ticket type: $($script:ContractDecision.TicketTypeId))"
+            }
+            else {
+                Write-Host "Using default charge rate (contract ticket or rate not specified)"
+            }
+            
             try {
-                $actionResult = New-HaloAction -Action $ActionUpdate
+                $null = New-HaloAction -Action $ActionUpdate
                 Write-Host "Successfully added resolution action to ticket $ticketidHalo"
             } catch {
                 Write-Host "ERROR adding resolution action to ticket $ticketidHalo`: $($_.Exception.Message)" -ForegroundColor Red

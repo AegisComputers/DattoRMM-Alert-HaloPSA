@@ -20,10 +20,19 @@
     },
     "TicketDefaults": {
         "TicketTypeId": 8,
+        "NonContractTicketTypeId": 9,
         "Category1": "Datto Alert",
         "SetTicketResponded": true,
         "DefaultSiteId": 286,
         "DefaultClientName": "Aegis Internal"
+    },
+    "ContractManagement": {
+        "EnableContractValidation": true,
+        "ContractTicketTypeId": 8,
+        "NonContractTicketTypeId": 9,
+        "NonContractChargeRate": 0,
+        "ValidateDeviceSupport": true,
+        "DefaultDeviceType": "PC"
     },
     "PriorityMapping": {
         "Critical": "4",

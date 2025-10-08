@@ -69,7 +69,8 @@ try {
             Write-Warning "Failed to connect to Azure Storage: $($_.Exception.Message)"
             Write-Warning "Storage-dependent functions may not work correctly."
         }
-    } else {
+    }
+    else {
         Write-Verbose "Skipping Azure Storage connection due to missing credentials"
     }
 }
@@ -196,12 +197,12 @@ function Get-WindowsErrorMessage {
     }
 
     if ($ErrorCode -like "*AccessDenied*") {
-		return "Access is denied."
-	}
+        return "Access is denied."
+    }
 
     #if ($ErrorCode -isnot [int]) {
-	#	return "ErrorCode must be an integer. Something went wrong when applying patch!"
-	#}
+    #	return "ErrorCode must be an integer. Something went wrong when applying patch!"
+    #}
 
     # Check for a custom error message first
     try {
@@ -209,7 +210,8 @@ function Get-WindowsErrorMessage {
         if ($customErrorMessage) {
             return $customErrorMessage
         }
-    } catch {
+    }
+    catch {
         Write-Debug "Failed to find custom error code entry for code $ErrorCode. Error: $_"
         $errorMessage = "Unknown error code or not a Win32 error."
     }
@@ -218,7 +220,8 @@ function Get-WindowsErrorMessage {
     try {
         $exception = New-Object System.ComponentModel.Win32Exception($ErrorCode)
         $errorMessage = $exception.Message
-    } catch {
+    }
+    catch {
         Write-Debug "Failed to create Win32Exception for code $ErrorCode. Error: $_"
         $errorMessage = "Unknown error code."
     }
@@ -231,7 +234,8 @@ function Get-WindowsErrorMessage {
                 $errorMessage = $onlineErrorMessage
             }
         }
-    } catch { 
+    }
+    catch { 
         Write-Debug "Failed to find online entry for code $ErrorCode. Error: $_"
         $errorMessage = "Unknown error code."
     }
@@ -278,10 +282,12 @@ function Get-OnlineErrorMessage {
         $match = [regex]::Match($response.Content, "<p>(.*?)</p>")
         if ($match.Success) {
             $onlineMessage = $match.Groups[1].Value
-        } else {
+        }
+        else {
             $onlineMessage = "Online lookup failed or error code not found."
         }
-    } catch {
+    }
+    catch {
         Write-Debug "Error during online lookup: $_"
         $onlineMessage = "Failed to connect to Microsoft or parse the response."
     }
@@ -340,7 +346,8 @@ function Invoke-HyperVReplicationAlert {
     try {
         $timeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById($businessHours.TimeZone)
         $CurrentTimeLocal = [System.TimeZoneInfo]::ConvertTimeFromUtc($CurrentTimeUTC, $timeZone)
-    } catch {
+    }
+    catch {
         Write-Warning "Invalid timezone '$($businessHours.TimeZone)'. Using UTC."
         $CurrentTimeLocal = $CurrentTimeUTC
     }
@@ -362,11 +369,13 @@ function Invoke-HyperVReplicationAlert {
             Write-Output "The current time is between $($businessHours.StartTime) and $($businessHours.EndTime) $($businessHours.TimeZone) time. A ticket will be created!"
             Write-Host "Creating Ticket"
             $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
-        } else {
+        }
+        else {
             Write-Output "The current time is outside of $($businessHours.StartTime) and $($businessHours.EndTime) $($businessHours.TimeZone) time. No ticket will be created!"
             Set-DrmmAlertResolve -alertUid $alertUID
         }
-    } catch {
+    }
+    catch {
         Write-Warning "Error parsing business hours times. Creating ticket anyway."
         $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
     }
@@ -410,7 +419,8 @@ function Invoke-PatchMonitorAlert {
                 
                 # Re-fetch the entity to get current state after potential merge
                 $entity = Get-StorageEntity -table $table -partitionKey $partitionKey -rowKey $rowKey
-            } else {
+            }
+            else {
                 # Increment the alert count and update the entity.
                 $entity.AlertCount++
                 Update-AzTableRow -Table $table -entity $entity
@@ -426,17 +436,20 @@ function Invoke-PatchMonitorAlert {
                 # Clean up the record from the table after handling the alert.
                 try {
                     remove-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey
-                } catch {
+                }
+                catch {
                     Write-Warning "Failed to clean up storage table row for $DeviceHostname`: $($_.Exception.Message)"
                 }
             }
-        } catch {
+        }
+        catch {
             Write-Warning "Storage operation failed for device $DeviceHostname`: $($_.Exception.Message). Proceeding without storage tracking."
             # If storage fails, create ticket anyway to ensure alert is handled
             Write-Host "Creating Ticket (storage bypass)"
             $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
         }
-    } else {
+    }
+    else {
         Write-Host "Alert missing in Datto RMM, no further action..."
     }
 }
@@ -493,10 +506,12 @@ function Find-ExistingSecurityAlert {
     if ($consolidatableTypesConfig) {
         if ($consolidatableTypesConfig -is [array]) {
             $consolidatableTypes = $consolidatableTypesConfig
-        } elseif ($consolidatableTypesConfig -is [PSObject]) {
+        }
+        elseif ($consolidatableTypesConfig -is [PSObject]) {
             # Convert PSObject to array if needed
             $consolidatableTypes = @($consolidatableTypesConfig.PSObject.Properties | ForEach-Object { $_.Value })
-        } else {
+        }
+        else {
             # Single item, make it an array
             $consolidatableTypes = @($consolidatableTypesConfig)
         }
@@ -546,7 +561,8 @@ function Find-ExistingSecurityAlert {
                 if ($ticket.summary -like "*$AlertType*") {
                     Write-Host "Found potential consolidation ticket: ID $($ticket.id) - $($ticket.summary)"
                     $matchingTickets += $ticket
-                } else {
+                }
+                else {
                     Write-Host "Ticket $($ticket.id) does not contain alert type '$AlertType' in summary: $($ticket.summary)"
                 }
             }
@@ -559,7 +575,8 @@ function Find-ExistingSecurityAlert {
                 $selectedTicket = $matchingTickets | Sort-Object { [int]$_.id } -Descending | Select-Object -First 1
                 Write-Host "Selected ticket ID $($selectedTicket.id) as the most recent for consolidation"
                 return $selectedTicket
-            } elseif ($matchingTickets.Count -eq 1) {
+            }
+            elseif ($matchingTickets.Count -eq 1) {
                 # Safe indexing for single item
                 $singleTicket = if ($matchingTickets -is [array]) { $matchingTickets[0] } else { $matchingTickets }
                 Write-Host "Found single matching ticket for consolidation: ID $($singleTicket.id)"
@@ -612,7 +629,8 @@ function Update-ExistingSecurityTicket {
         $ticketActions = @()
         try {
             $ticketActions = Get-HaloAction -TicketID $ExistingTicket.id -Count 10000
-        } catch {
+        }
+        catch {
             Write-Warning "Failed to get actions for ticket $($ExistingTicket.id): $($_.Exception.Message)"
         }
         
@@ -625,7 +643,8 @@ function Update-ExistingSecurityTicket {
         # Safely get count - ensure we always have a valid count
         $consolidationCount = if ($consolidationNotes -and $consolidationNotes.Count) { 
             $consolidationNotes.Count 
-        } else { 
+        }
+        else { 
             0 
         }
         $currentCount = $consolidationCount + 1 # +1 for the original ticket
@@ -644,7 +663,14 @@ function Update-ExistingSecurityTicket {
                 $deviceName = $matches[1]
             }
             
-            Send-AlertConsolidationTeamsNotification -DeviceName $deviceName -AlertType $AlertType -AlertDetails $AlertType -OccurrenceCount ($currentCount + 1) -TicketId $ExistingTicket.id -AlertWebhook $NewAlertDetails
+            # Wrap Teams notification in try-catch to prevent it from crashing the consolidation
+            try {
+                Send-AlertConsolidationTeamsNotification -DeviceName $deviceName -AlertType $AlertType -AlertDetails $AlertType -OccurrenceCount ($currentCount + 1) -TicketId $ExistingTicket.id -AlertWebhook $NewAlertDetails
+            }
+            catch {
+                Write-Warning "Teams notification failed but continuing with ticket update: $($_.Exception.Message)"
+                # Don't throw - just log and continue with the consolidation
+            }
         }
         
         # Create consolidation note
@@ -662,16 +688,22 @@ function Update-ExistingSecurityTicket {
         
         # Create the action object for adding a note
         $actionToAdd = @{
-            ticket_id = $ExistingTicket.id
-            actionid          = 23
-            outcome           = "Remote"
-            outcome_id        = 23
-            note = $consolidationNote
-            actionarrivaldate = Get-Date
+            ticket_id            = $ExistingTicket.id
+            actionid             = 23
+            outcome              = "Remote"
+            outcome_id           = 23
+            note                 = $consolidationNote
+            actionarrivaldate    = Get-Date
             actioncompletiondate = Get-Date
-            action_isresponse = $false
-            validate_response = $false
-            sendemail = $false
+            action_isresponse    = $false
+            validate_response    = $false
+            sendemail            = $false
+        }
+        
+        # Apply charge rate 0 for non-contract tickets (ticket type != 8)
+        if ($ExistingTicket.tickettype_id -and $ExistingTicket.tickettype_id -ne 8) {
+            $actionToAdd.chargerate = 0
+            Write-Host "Applied charge rate 0 for non-contract ticket (Type ID: $($ExistingTicket.tickettype_id))"
         }
         
         # Add the note to the ticket
@@ -680,7 +712,8 @@ function Update-ExistingSecurityTicket {
         if ($actionResult) {
             Write-Host "Successfully updated ticket $($ExistingTicket.id) with new alert details."
             return $true
-        } else {
+        }
+        else {
             Write-Warning "Failed to update ticket $($ExistingTicket.id)."
             return $false
         }
@@ -716,7 +749,8 @@ function Test-AlertConsolidation {
         # Extract device name from ticket summary
         if ($HaloTicketCreate.summary -match "Device:\s*([^\s]+)\s+raised Alert") {
             $deviceName = $matches[1]
-        } else {
+        }
+        else {
             Write-Host "Could not extract device name from ticket summary: $($HaloTicketCreate.summary)"
             return $false
         }
@@ -728,10 +762,12 @@ function Test-AlertConsolidation {
         if ($HaloTicketCreate.summary -match "raised Alert:\s*([^-]+)\s*-\s*(.+?)(\s+Subject:|$)") {
             # Extract the message part after the dash
             $alertType = $matches[2].Trim().TrimEnd('.')
-        } elseif ($HaloTicketCreate.summary -match "raised Alert:\s*(.+?)(\s+Subject:|$)") {
+        }
+        elseif ($HaloTicketCreate.summary -match "raised Alert:\s*(.+?)(\s+Subject:|$)") {
             # Fallback to extract everything after "raised Alert:"
             $alertType = $matches[1].Trim().TrimEnd('.')
-        } else {
+        }
+        else {
             Write-Host "Could not extract alert type from ticket summary: $($HaloTicketCreate.summary)"
             return $false
         }
@@ -751,11 +787,13 @@ function Test-AlertConsolidation {
             if ($updateResult) {
                 Write-Host "Successfully consolidated alert into existing ticket $($existingTicket.id)"
                 return $true
-            } else {
+            }
+            else {
                 Write-Warning "Failed to consolidate alert. Will create new ticket."
                 return $false
             }
-        } else {
+        }
+        else {
             Write-Host "No existing ticket found for consolidation. Will create new ticket."
             return $false
         }
@@ -809,10 +847,12 @@ function Find-ExistingMemoryUsageAlert {
     if ($consolidatableTypesConfig) {
         if ($consolidatableTypesConfig -is [array]) {
             $consolidatableTypes = $consolidatableTypesConfig
-        } elseif ($consolidatableTypesConfig -is [PSObject]) {
+        }
+        elseif ($consolidatableTypesConfig -is [PSObject]) {
             # Convert PSObject to array if needed
             $consolidatableTypes = @($consolidatableTypesConfig.PSObject.Properties | ForEach-Object { $_.Value })
-        } else {
+        }
+        else {
             # Single item, make it an array
             $consolidatableTypes = @($consolidatableTypesConfig)
         }
@@ -903,14 +943,16 @@ function Test-MemoryUsageConsolidation {
         
         if ($HaloTicketCreate.summary -match "Device:\s*([^\s]+)\s+raised Alert") {
             $deviceName = $matches[1]
-        } else {
+        }
+        else {
             Write-Host "Could not extract device name from memory usage alert: $($HaloTicketCreate.summary)"
             return $false
         }
         
         if ($HaloTicketCreate.summary -match "Memory Usage reached (\d+)%") {
             $memoryPercentage = [int]$matches[1]
-        } else {
+        }
+        else {
             Write-Host "Could not extract memory percentage from alert: $($HaloTicketCreate.summary)"
             return $false
         }
@@ -929,11 +971,13 @@ function Test-MemoryUsageConsolidation {
             if ($updateResult) {
                 Write-Host "Successfully consolidated memory usage alert into existing ticket $($existingTicket.id)"
                 return $true
-            } else {
+            }
+            else {
                 Write-Warning "Failed to consolidate memory usage alert. Will create new ticket."
                 return $false
             }
-        } else {
+        }
+        else {
             Write-Host "No existing memory usage ticket found for consolidation. Will create new ticket."
             return $false
         }
@@ -990,12 +1034,14 @@ function Update-ExistingMemoryUsageTicket {
                 # Safely get count - ensure we always have a valid count
                 $memoryUsageCount = if ($memoryUsageNotes -and $memoryUsageNotes.Count) { 
                     $memoryUsageNotes.Count 
-                } else { 
+                }
+                else { 
                     0 
                 }
                 $occurrenceCount = $memoryUsageCount + 1
             }
-        } catch {
+        }
+        catch {
             Write-Warning "Failed to get actions for memory consolidation ticket $($ExistingTicket.id): $($_.Exception.Message)"
         }
         
@@ -1008,7 +1054,14 @@ function Update-ExistingMemoryUsageTicket {
         # Check if we should send a Teams notification for high consolidation count
         $teamsNotificationThreshold = Get-AlertingConfig -Path "AlertConsolidation.TeamsNotificationThreshold" -DefaultValue 3
         if ($occurrenceCount -ge $teamsNotificationThreshold) {
-            Send-MemoryUsageTeamsNotification -DeviceName $DeviceName -MemoryPercentage $MemoryPercentage -OccurrenceCount $occurrenceCount -TicketId $ExistingTicket.id -AlertWebhook $AlertWebhook
+            # Wrap Teams notification in try-catch to prevent it from crashing the consolidation
+            try {
+                Send-MemoryUsageTeamsNotification -DeviceName $DeviceName -MemoryPercentage $MemoryPercentage -OccurrenceCount $occurrenceCount -TicketId $ExistingTicket.id -AlertWebhook $AlertWebhook
+            }
+            catch {
+                Write-Warning "Teams notification failed but continuing with ticket update: $($_.Exception.Message)"
+                # Don't throw - just log and continue with the consolidation
+            }
         }
         
         # Update the ticket summary to reflect latest memory usage
@@ -1017,13 +1070,13 @@ function Update-ExistingMemoryUsageTicket {
         # Create the consolidation note
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         $consolidationNote = $noteTemplate -replace "{DeviceName}", $DeviceName `
-                                          -replace "{MemoryPercentage}", $MemoryPercentage `
-                                          -replace "{Timestamp}", $timestamp `
-                                          -replace "{Count}", $occurrenceCount
+            -replace "{MemoryPercentage}", $MemoryPercentage `
+            -replace "{Timestamp}", $timestamp `
+            -replace "{Count}", $occurrenceCount
         
         # Prepare ticket update
         $ticketUpdate = @{
-            id = $ExistingTicket.id
+            id      = $ExistingTicket.id
             summary = $updatedSummary
         }
         
@@ -1035,11 +1088,17 @@ function Update-ExistingMemoryUsageTicket {
         if ($updateResult) {
             # Add the consolidation note
             $action = @{
-                ticket_id = $ExistingTicket.id
-                note = $consolidationNote
-                note_html = "<p><strong>Memory Usage Alert Consolidation:</strong><br>$consolidationNote</p>"
+                ticket_id    = $ExistingTicket.id
+                note         = $consolidationNote
+                note_html    = "<p><strong>Memory Usage Alert Consolidation:</strong><br>$consolidationNote</p>"
                 actiontypeid = 1  # Note action type
-                sendemail = $false
+                sendemail    = $false
+            }
+            
+            # Apply charge rate 0 for non-contract tickets (ticket type != 8)
+            if ($ExistingTicket.tickettype_id -and $ExistingTicket.tickettype_id -ne 8) {
+                $action.chargerate = 0
+                Write-Host "Applied charge rate 0 for non-contract ticket (Type ID: $($ExistingTicket.tickettype_id))"
             }
             
             $actionResult = New-HaloAction -Action $action
@@ -1047,11 +1106,13 @@ function Update-ExistingMemoryUsageTicket {
             if ($actionResult) {
                 Write-Host "Successfully updated memory usage ticket $($ExistingTicket.id) with consolidation data"
                 return $true
-            } else {
+            }
+            else {
                 Write-Warning "Updated ticket but failed to add consolidation note"
                 return $true  # Still consider it successful since ticket was updated
             }
-        } else {
+        }
+        else {
             Write-Error "Failed to update memory usage ticket $($ExistingTicket.id)"
             return $false
         }
@@ -1075,7 +1136,8 @@ function Get-TeamsWebhookConfig {
         if (Test-Path $configPath) {
             $config = Get-Content $configPath | ConvertFrom-Json
             return $config
-        } else {
+        }
+        else {
             Write-Warning "Teams webhook config file not found at: $configPath"
             return $null
         }
@@ -1156,10 +1218,12 @@ function Send-AlertConsolidationTeamsNotification {
                 if ($OccurrenceCount -ge 5) {
                     $severity = "Critical"
                     $color = "attention" # Red
-                } elseif ($OccurrenceCount -ge 3) {
+                }
+                elseif ($OccurrenceCount -ge 3) {
                     $severity = "High"
                     $color = "attention"
-                } else {
+                }
+                else {
                     $severity = "Medium"
                     $color = "warning"
                 }
@@ -1172,7 +1236,8 @@ function Send-AlertConsolidationTeamsNotification {
                     if ($memoryPercentage -ge 95 -or $OccurrenceCount -ge 5) {
                         $severity = "Critical"
                         $color = "attention"
-                    } elseif ($memoryPercentage -ge 85 -and $OccurrenceCount -ge 3) {
+                    }
+                    elseif ($memoryPercentage -ge 85 -and $OccurrenceCount -ge 3) {
                         $severity = "High"
                         $color = "attention"
                     }
@@ -1183,7 +1248,8 @@ function Send-AlertConsolidationTeamsNotification {
                 if ($OccurrenceCount -ge 5) {
                     $severity = "High"
                     $color = "attention"
-                } elseif ($OccurrenceCount -ge 3) {
+                }
+                elseif ($OccurrenceCount -ge 3) {
                     $severity = "Medium"
                     $color = "warning"
                 }
@@ -1193,7 +1259,8 @@ function Send-AlertConsolidationTeamsNotification {
                 if ($OccurrenceCount -ge 10) {
                     $severity = "High"
                     $color = "attention"
-                } elseif ($OccurrenceCount -ge 5) {
+                }
+                elseif ($OccurrenceCount -ge 5) {
                     $severity = "Medium"
                     $color = "warning"
                 }
@@ -1203,7 +1270,8 @@ function Send-AlertConsolidationTeamsNotification {
                 if ($OccurrenceCount -ge 5) {
                     $severity = "High"
                     $color = "attention"
-                } elseif ($OccurrenceCount -ge 3) {
+                }
+                elseif ($OccurrenceCount -ge 3) {
                     $severity = "Medium"
                     $color = "warning"
                 }
@@ -1221,36 +1289,37 @@ function Send-AlertConsolidationTeamsNotification {
             if ($siteDetails -match "(.+)\((.+)\)") {
                 $siteInfo = $matches[1].Trim()
                 $clientInfo = $matches[2].Trim()
-            } else {
+            }
+            else {
                 $siteInfo = $siteDetails
             }
         }
         
         # Create the Teams message payload using Adaptive Cards
         $teamsPayload = @{
-            type = "message"
+            type        = "message"
             attachments = @(
                 @{
                     contentType = "application/vnd.microsoft.card.adaptive"
-                    content = @{
-                        type = "AdaptiveCard"
+                    content     = @{
+                        type    = "AdaptiveCard"
                         version = "1.4"
-                        body = @(
+                        body    = @(
                             @{
-                                type = "Container"
+                                type  = "Container"
                                 style = $color
                                 items = @(
                                     @{
-                                        type = "TextBlock"
-                                        text = "$icon Alert Consolidation: $AlertType"
+                                        type   = "TextBlock"
+                                        text   = "$icon Alert Consolidation: $AlertType"
                                         weight = "Bolder"
-                                        size = "Large"
-                                        color = "Light"
+                                        size   = "Large"
+                                        color  = "Light"
                                     }
                                 )
                             },
                             @{
-                                type = "FactSet"
+                                type  = "FactSet"
                                 facts = @(
                                     @{
                                         title = "Device"
@@ -1291,17 +1360,17 @@ function Send-AlertConsolidationTeamsNotification {
                                 )
                             },
                             @{
-                                type = "TextBlock"
-                                text = "Multiple **$AlertType** alerts have been consolidated for device **$DeviceName**. This may indicate a persistent issue requiring attention."
-                                wrap = $true
+                                type    = "TextBlock"
+                                text    = "Multiple **$AlertType** alerts have been consolidated for device **$DeviceName**. This may indicate a persistent issue requiring attention."
+                                wrap    = $true
                                 spacing = "Medium"
                             }
                         )
                         actions = @(
                             @{
-                                type = "Action.OpenUrl"
+                                type  = "Action.OpenUrl"
                                 title = "View Ticket in HaloPSA"
-                                url = "https://support.aegis-group.co.uk/tickets?id=$TicketId"
+                                url   = "https://support.aegis-group.co.uk/tickets?id=$TicketId"
                             }
                         )
                     }
@@ -1314,25 +1383,53 @@ function Send-AlertConsolidationTeamsNotification {
         
         Write-Host "Sending Teams notification for $AlertType consolidation on device $DeviceName (Alert #$OccurrenceCount)"
         
-        # Send the webhook
-        $null = Invoke-RestMethod -Uri $teamsWebhookUrl -Method POST -Body $jsonPayload -ContentType "application/json" -ErrorAction Stop
-        
-        Write-Host "Teams notification sent successfully for $AlertType consolidation"
+        # Send the webhook with graceful error handling
+        try {
+            $null = Invoke-RestMethod -Uri $teamsWebhookUrl -Method POST -Body $jsonPayload -ContentType "application/json" -ErrorAction Stop
+            Write-Host "Teams notification sent successfully for $AlertType consolidation"
+        }
+        catch {
+            # Log the error but don't throw - we don't want Teams notification failures to crash alert processing
+            Write-Warning "Failed to send Teams notification, but continuing with alert processing"
+            Write-Warning "Error: $($_.Exception.Message)"
+            
+            # Log detailed info for debugging
+            if ($_.Exception.Response) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
+                Write-Host "HTTP Status Code: $statusCode"
+                
+                if ($statusCode -eq 400) {
+                    Write-Warning "Bad Request (400) - Check if Teams workflow is enabled and webhook URL is correct"
+                }
+                elseif ($statusCode -eq 404) {
+                    Write-Warning "Not Found (404) - Webhook URL may be invalid or expired"
+                }
+                elseif ($statusCode -eq 429) {
+                    Write-Warning "Too Many Requests (429) - Rate limit exceeded"
+                }
+            }
+            
+            # Log payload info for debugging (without exposing sensitive data)
+            Write-Host "Payload length: $($jsonPayload.Length) bytes"
+            
+            # Don't throw - just log and continue
+            # The error is already logged and alert processing can continue
+        }
         
         # Record that we've sent a notification today for this device/alert type
         Record-DailyTeamsNotificationSent -DeviceName $DeviceName -AlertType $AlertType -TicketId $TicketId
         
         # Log the notification for monitoring
         $logEntry = @{
-            Timestamp = $timestamp
-            Device = $DeviceName
-            Client = $clientInfo
-            Site = $siteInfo
-            AlertType = $AlertType
-            AlertDetails = $AlertDetails
-            OccurrenceCount = $OccurrenceCount
-            TicketId = $TicketId
-            Severity = $severity
+            Timestamp        = $timestamp
+            Device           = $DeviceName
+            Client           = $clientInfo
+            Site             = $siteInfo
+            AlertType        = $AlertType
+            AlertDetails     = $AlertDetails
+            OccurrenceCount  = $OccurrenceCount
+            TicketId         = $TicketId
+            Severity         = $severity
             NotificationSent = $true
         }
         
@@ -1341,22 +1438,24 @@ function Send-AlertConsolidationTeamsNotification {
     }
 
     catch {
-        Write-Error "Failed to send Teams notification for $AlertType consolidation: $($_.Exception.Message)"
-        Write-Host "Teams webhook URL: $teamsWebhookUrl"
+        # Outer catch block for any unexpected errors in the function
+        Write-Warning "Unexpected error in Teams notification function: $($_.Exception.Message)"
         Write-Host "Error details: $($_.Exception.ToString())"
         
-        # Log the failure
+        # Log the failure but don't crash
         $errorLogEntry = @{
-            Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-            Device = $DeviceName
-            AlertType = $AlertType
-            OccurrenceCount = $OccurrenceCount
-            TicketId = $TicketId
+            Timestamp        = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+            Device           = $DeviceName
+            AlertType        = $AlertType
+            OccurrenceCount  = $OccurrenceCount
+            TicketId         = $TicketId
             NotificationSent = $false
-            Error = $_.Exception.Message
+            Error            = $_.Exception.Message
         }
         
         Write-Host "TEAMS_NOTIFICATION_ERROR: $($errorLogEntry | ConvertTo-Json -Compress)"
+        
+        # Don't throw - just log the error and let alert processing continue
     }
 }
 
@@ -1399,11 +1498,13 @@ function Test-DailyTeamsNotificationSent {
         if ($existingRecord) {
             Write-Host "Teams notification already sent today for $DeviceName ($AlertType)"
             return $true
-        } else {
+        }
+        else {
             Write-Host "No Teams notification sent today for $DeviceName ($AlertType)"
             return $false
         }
-    } catch {
+    }
+    catch {
         Write-Warning "Failed to check Teams notification history: $($_.Exception.Message)"
         # On error, allow the notification to be sent
         return $false
@@ -1448,20 +1549,21 @@ function Record-DailyTeamsNotificationSent {
         
         # Create record
         $record = @{
-            PartitionKey = $partitionKey
-            RowKey = $rowKey
-            DeviceName = $DeviceName
-            AlertType = $AlertType
-            TicketId = $TicketId
+            PartitionKey     = $partitionKey
+            RowKey           = $rowKey
+            DeviceName       = $DeviceName
+            AlertType        = $AlertType
+            TicketId         = $TicketId
             NotificationDate = $today
-            Timestamp = $timestamp
+            Timestamp        = $timestamp
         }
         
         # Store the record
         $null = Add-AzTableRow -Table $table -PartitionKey $partitionKey -RowKey $rowKey -Property $record -ErrorAction Stop
         Write-Host "Recorded Teams notification for $DeviceName ($AlertType) - Ticket #$TicketId"
         
-    } catch {
+    }
+    catch {
         Write-Warning "Failed to record Teams notification: $($_.Exception.Message)"
         # Don't throw error - notification was already sent successfully
     }

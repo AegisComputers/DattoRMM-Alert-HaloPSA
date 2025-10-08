@@ -101,6 +101,9 @@ function Find-DattoAlertHaloClient {
             Write-Warning "No Halo client found for '$DattoCustomer'."
             return $null
         }
+
+        Get-HaloContract -ClientID 3 -FullObjects
+
         # Safe client indexing
         $HaloClientID = if ($HaloClients -is [array]) { $HaloClients[0].id } else { $HaloClients.id }
 

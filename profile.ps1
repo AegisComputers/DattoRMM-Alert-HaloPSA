@@ -24,7 +24,8 @@ Write-Host "Function App cold start at: $coldStartTime"
 #Custom Modules - Load in dependency order
 $moduleLoadOrder = @(
     "CoreHelper.psm1",
-    "ConfigurationManager.psm1", 
+    "ConfigurationManager.psm1",
+    "ContractHelper.psm1",
     "EmailHelper.psm1",
     "HaloHelper.psm1",
     "DattoRMMGenerator.psm1",
