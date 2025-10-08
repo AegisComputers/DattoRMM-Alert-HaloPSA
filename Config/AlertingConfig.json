@@ -1,6 +1,6 @@
 {
     "AlertThresholds": {
-        "PatchAlertCount": 2,
+        "PatchAlertCount": 8,
         "HtmlBodyMaxLength": 3000000,
         "RelatedAlertWindowMinutes": 5,
         "HaloAlertHistoryDays": 30,

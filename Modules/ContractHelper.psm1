@@ -17,6 +17,12 @@ function Get-DeviceTypeFromAlert {
     
     .RETURNS
     String: "Server", "PC", or "Unknown"
+    
+    .NOTES
+    Priority order:
+    1. Trust Datto's deviceType field (Server/Desktop/Laptop)
+    2. Use hostname patterns only as fallback (word boundaries to avoid false positives)
+    3. Default to PC if uncertain (safer for billing)
     #>
     param(
         [Parameter(Mandatory)]
@@ -24,39 +30,51 @@ function Get-DeviceTypeFromAlert {
     )
     
     try {
-        # Check device type from Datto
-        # Datto typically uses 'deviceType' field: "Server", "Workstation", "Laptop", "Desktop", etc.
-        if ($DattoDevice.deviceType) {
-            $deviceType = $DattoDevice.deviceType
+        # PRIORITY 1: Trust Datto's deviceType field
+        # Datto provides: "Server", "Desktop", "Laptop", "Workstation"
+        if ($DattoDevice.deviceType -and $DattoDevice.deviceType.Trim() -ne "") {
+            $deviceType = $DattoDevice.deviceType.Trim()
             
             # Map Datto device types to our categories
-            if ($deviceType -match "Server|Domain Controller|Hyper-V|ESXi") {
-                Write-Host "Device identified as Server (Type: $deviceType)"
+            if ($deviceType -eq "Server") {
+                Write-Host "Device identified as Server (Datto Type: $deviceType)"
                 return "Server"
             }
-            elseif ($deviceType -match "Workstation|Desktop|Laptop|PC") {
-                Write-Host "Device identified as PC (Type: $deviceType)"
+            elseif ($deviceType -match "^(Desktop|Laptop|Workstation)$") {
+                Write-Host "Device identified as PC (Datto Type: $deviceType)"
                 return "PC"
+            }
+            else {
+                Write-Host "Unknown Datto device type '$deviceType', will try hostname pattern matching"
             }
         }
         
-        # Fallback: Check hostname patterns
+        # PRIORITY 2: Fallback to hostname patterns (with word boundaries to avoid false matches)
         if ($DattoDevice.hostname) {
-            $hostname = $DattoDevice.hostname
+            $hostname = $DattoDevice.hostname.ToUpper()
             
-            # Common server naming patterns: SRV, SERVER, DC, SQL, EXCH, etc.
-            if ($hostname -match "^(SRV|SERVER|DC|SQL|EXCH|HYP|ESX|VM|HOST)") {
+            # Server patterns: Use word boundaries and common server naming conventions
+            # Examples: CL01-HYP01, DC01, SQL-PROD, HYP-HOST01, AC-SERVER
+            # Patterns: cl\d+ (clusters), hyp (hypervisors), dc\d+ (domain controllers), 
+            #           ac- followed by server indicators, sql, exch, etc.
+            if ($hostname -match '\b(CL\d+|HYP|DC\d+|SQL|EXCH|ESX|VM-|HOST)\b' -or
+                $hostname -match '^(SRV|SERVER)' -or
+                $hostname -match '-SRV\b|-SERVER\b') {
                 Write-Host "Device identified as Server based on hostname pattern: $hostname"
                 return "Server"
             }
-            # Common workstation patterns: WKS, DESK, LAP, PC
-            elseif ($hostname -match "^(WKS|DESK|LAP|PC|NB)") {
+            
+            # PC patterns: Use word boundaries to avoid matching within words like "accrington"
+            # Examples: WKS01, DESK-USER, LAP-123, PC01, NB-001
+            # Must start with or have hyphen before pattern to avoid "acc-lap" matching "lap"
+            if ($hostname -match '^(WKS|DESK|LAP|PC\d+|NB)-' -or
+                $hostname -match '^(WORKSTATION|DESKTOP|LAPTOP|NOTEBOOK)\b') {
                 Write-Host "Device identified as PC based on hostname pattern: $hostname"
                 return "PC"
             }
         }
         
-        # Default to PC if we can't determine (safer default for charging)
+        # PRIORITY 3: Default to PC if we can't determine (safer default for charging)
         Write-Warning "Could not determine device type, defaulting to PC"
         return "PC"
     }
@@ -275,12 +293,15 @@ function Get-ContractTicketingDecision {
         $deviceType = Get-DeviceTypeFromAlert -DattoDevice $DattoDevice
         $result.DeviceType = $deviceType
         
-        # Step 2: Filter contracts by site and ref pattern
-        Write-Host "Filtering $($Contracts.Count) contracts for site ID $HaloSiteID"
-        $filteredContracts = $Contracts | Where-Object {
-            ($_.ref -like '*M' -and $_.site_id -eq $HaloSiteID) -or
-            ($_.ref -like 'InternalWork' -and $_.site_id -eq $HaloSiteID)
-        }
+        # Step 2: Ensure $Contracts is always an array to avoid .Count property errors
+        $contractsArray = @($Contracts)
+        
+        # Filter contracts by site and ref pattern
+        Write-Host "Filtering $($contractsArray.Count) contracts for site ID $HaloSiteID"
+        $filteredContracts = @($contractsArray | Where-Object {
+                ($_.ref -like '*M' -and $_.site_id -eq $HaloSiteID) -or
+                ($_.ref -like 'InternalWork' -and $_.site_id -eq $HaloSiteID)
+            })
         
         Write-Host "Found $($filteredContracts.Count) MSA/*M contracts"
         
