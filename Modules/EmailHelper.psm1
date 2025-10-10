@@ -35,18 +35,53 @@ function Get-HaloUserEmail {
 
     try {
         # Try to execute the following block of code
-        # Retrieve the email address by calling the Get-HaloUser cmdlet with the provided Username and ClientId
-        # Access the 'emailaddress' property of the returned object and assign it to the variable $address
-        $address = (Get-HaloUser -Search $Username -ClientID $ClientId).emailaddress
-
+        Write-Host "Looking up user '$Username' for client ID $ClientId"
+        
+        # Retrieve user(s) by calling the Get-HaloUser cmdlet with the provided Username and ClientId
+        $users = @(Get-HaloUser -Search $Username -ClientID $ClientId)
+        
+        if (-not $users -or $users.Count -eq 0) {
+            Write-Warning "No users found matching '$Username' with client ID $ClientId"
+            return $false
+        }
+        
+        # Try to find best match - prioritize exact matches on various fields
+        $matchedUser = $null
+        
+        # First, try exact username match (case-insensitive)
+        $matchedUser = $users | Where-Object { $_.name -eq $Username } | Select-Object -First 1
+        
+        # If no exact match, try matching network login (common for AD usernames)
+        if (-not $matchedUser) {
+            $matchedUser = $users | Where-Object { $_.networklogin -like "*$Username*" } | Select-Object -First 1
+        }
+        
+        # If still no match, try matching email address prefix (e.g., jordan.kippax from jordan.kippax@domain.com)
+        if (-not $matchedUser) {
+            $matchedUser = $users | Where-Object { $_.emailaddress -like "$Username@*" } | Select-Object -First 1
+        }
+        
+        # If still no match, try matching AD object
+        if (-not $matchedUser) {
+            $matchedUser = $users | Where-Object { $_.adobject -like "*$Username*" } | Select-Object -First 1
+        }
+        
+        # If still no match, just take the first result (search found something)
+        if (-not $matchedUser) {
+            Write-Host "No exact match found, using first search result"
+            $matchedUser = $users[0]
+        }
+        
+        $address = $matchedUser.emailaddress
+        
         if (-not $address) {
             # If $address is null or empty, write an error message indicating no email address was found
-            Write-Error "No email address found for user $Username with client ID $ClientId"
+            Write-Warning "User found but no email address set for user '$($matchedUser.name)' (ID: $($matchedUser.id))"
             return $false
-            # Return $false to indicate failure
         }
         else { 
             # If an email address was found, return it
+            Write-Host "Found email address '$address' for user '$($matchedUser.name)'"
             return $address
         }
     }
