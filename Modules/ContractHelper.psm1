@@ -316,12 +316,26 @@ function Get-ContractTicketingDecision {
         
         # Filter contracts by site and ref pattern
         Write-Host "Filtering $($contractsArray.Count) contracts for site ID $HaloSiteID"
+        
+        # DEBUG: Show all contracts BEFORE filtering
+        Write-Host "=== DEBUG: All Contracts Before Filtering ==="
+        foreach ($contract in $contractsArray) {
+            $refTrimmed = if ($contract.ref) { $contract.ref.Trim() } else { 'NULL' }
+            Write-Host "  Contract ID: $($contract.id) | ref: '$refTrimmed' | site_id: $($contract.site_id) | Expected site: $HaloSiteID"
+        }
+        Write-Host "=== END DEBUG ==="
+        
         $filteredContracts = @($contractsArray | Where-Object {
-                ($_.ref -like '*M' -and $_.site_id -eq $HaloSiteID) -or
-                ($_.ref -like 'InternalWork' -and $_.site_id -eq $HaloSiteID)
+                $matchesPattern = ($_.ref -like '*M' -or $_.ref -like 'InternalWork')
+                $isClientLevel = ($_.site_id -eq 0 -or $null -eq $_.site_id)
+                $matchesSite = ($_.site_id -eq $HaloSiteID)
+                
+                # Match if: correct pattern AND (site-specific OR client-level)
+                # Client-level contracts (site_id = 0) apply to all sites under that client
+                return ($matchesPattern -and ($matchesSite -or $isClientLevel))
             })
         
-        Write-Host "Found $($filteredContracts.Count) MSA/*M contracts"
+        Write-Host "Found $($filteredContracts.Count) MSA/*M contracts (including client-level)"
         
         if ($filteredContracts.Count -eq 0) {
             $result.Reason = "No MSA or *M contract found for this site"
