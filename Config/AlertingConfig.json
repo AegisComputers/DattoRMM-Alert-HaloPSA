@@ -71,6 +71,11 @@
             "SendEmailToUser": true,
             "EmailTemplate": "<p>Your local storage is running low, with less than 10% remaining. To free up space, you might consider:<br><br>- Deleting unnecessary downloaded files<br>- Emptying the Recycle Bin<br>- Moving large files to cloud storage (e.g. OneDrive) and marking them as cloud-only.<br><br>If you're unable to resolve this issue or need further assistance, please reply to this email for support or call Aegis on 01865 393760.</p>",
             "SupportPhone": "01865 393760"
+        },
+        "PatchFailure": {
+            "SendEmailToUser": true,
+            "EmailTemplate": "<p>Your device has failed to install recent Windows updates after multiple attempts. This could leave your device vulnerable to security issues.</p><p><strong>To manually install updates, please follow these steps:</strong></p><ol><li>Click the <strong>Start</strong> button (Windows icon in bottom-left corner)</li><li>Type <strong>\"Windows Update\"</strong> and click on <strong>\"Windows Update settings\"</strong></li><li>Click the <strong>\"Check for updates\"</strong> button</li><li>If updates are found, click <strong>\"Install now\"</strong></li><li>Your computer may need to restart to complete the installation</li></ol><p>If the updates continue to fail or you encounter any errors, please reply to this email for support or call Aegis on 01865 393760.</p>",
+            "SupportPhone": "01865 393760"
         }
     },
     "WindowsErrorCodes": {

@@ -431,7 +431,43 @@ function Invoke-PatchMonitorAlert {
             if ($entity.AlertCount -ge $threshold) {
                 Write-Output "Alert count for $DeviceHostname has reached the threshold of $threshold."
                 Write-Host "Creating Ticket"
-                $null = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+                $ticketResult = New-HaloTicketWithFallback -HaloTicketCreate $HaloTicketCreate
+                
+                # Send user notification email if ticket was created successfully
+                if ($ticketResult -and $ticketResult.id) {
+                    Write-Host "Attempting to send patch failure email to device user..."
+                    
+                    # Get Halo device information to retrieve user details
+                    try {
+                        $HaloDeviceReport = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Device Report"
+                        if ($HaloDeviceReport) {
+                            $reportId = if ($HaloDeviceReport -is [array]) { $HaloDeviceReport[0].id } else { $HaloDeviceReport.id }
+                            $HaloDevice = Invoke-HaloReport -Report $reportId -IncludeReport | 
+                            Where-Object { $_.DDattoID -eq $AlertDRMM.alertSourceInfo.deviceUid }
+                            
+                            if ($HaloDevice -and $HaloDevice.user_name) {
+                                # Get the client ID from the ticket
+                                $clientId = $HaloTicketCreate.client_id
+                                
+                                # Send the patch failure email
+                                $emailSent = Send-PatchFailureUserEmail -HaloDevice $HaloDevice -ClientId $clientId -TicketId $ticketResult.id
+                                
+                                if ($emailSent) {
+                                    Write-Host "Patch failure notification email sent successfully to $($HaloDevice.user_name)"
+                                }
+                                else {
+                                    Write-Host "Unable to send patch failure email to user"
+                                }
+                            }
+                            else {
+                                Write-Host "No primary user found for device $DeviceHostname - skipping user email"
+                            }
+                        }
+                    }
+                    catch {
+                        Write-Warning "Error sending patch failure user email: $($_.Exception.Message)"
+                    }
+                }
                 
                 # Clean up the record from the table after handling the alert.
                 try {
