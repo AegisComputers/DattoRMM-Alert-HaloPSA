@@ -331,27 +331,59 @@ function Get-ContractTicketingDecision {
         }
         Write-Host "=== END DEBUG ==="
         
+        # PRIORITY 1: Try to find exact site match first
         $filteredContracts = @($contractsArray | Where-Object {
-                # Match contracts ending with M, MSA, or containing InternalWork
-                # Examples: "MSA - OKA01/01M", "LRG01/01/02/03MSA", "InternalWork"
                 $matchesPattern = ($_.ref -like '*M' -or $_.ref -like '*MSA' -or $_.ref -like 'InternalWork')
-                $isClientLevel = ($_.site_id -eq 0 -or $null -eq $_.site_id)
-                $isInternalWork = ($_.ref -like 'InternalWork' -and $_.site_id -eq -1)
                 $matchesSite = ($_.site_id -eq $HaloSiteID)
-                
-                # Match if: 
-                # 1. InternalWork contract (site_id = -1) - for Aegis internal team work
-                # 2. Correct pattern AND (site-specific OR client-level)
-                # Client-level contracts (site_id = 0) apply to all sites under that client
-                return ($isInternalWork -or ($matchesPattern -and ($matchesSite -or $isClientLevel)))
+                return ($matchesPattern -and $matchesSite)
             })
         
-        Write-Host "Found $($filteredContracts.Count) MSA/*M/*MSA/InternalWork contracts (including client-level and Aegis internal)"
-        
-        if ($filteredContracts.Count -eq 0) {
-            $result.Reason = "No MSA, *M, or *MSA contract found for this site"
-            Write-Host "⚠ $($result.Reason)"
-            return $result
+        if ($filteredContracts.Count -gt 0) {
+            Write-Host "✓ Found $($filteredContracts.Count) contract(s) with EXACT site match (Priority 1)"
+        }
+        else {
+            # PRIORITY 2: Try client-level contracts (site_id = 0 or null)
+            Write-Host "No exact site match found, checking client-level contracts..."
+            $filteredContracts = @($contractsArray | Where-Object {
+                    $matchesPattern = ($_.ref -like '*M' -or $_.ref -like '*MSA' -or $_.ref -like 'InternalWork')
+                    $isClientLevel = ($_.site_id -eq 0 -or $null -eq $_.site_id)
+                    return ($matchesPattern -and $isClientLevel)
+                })
+            
+            if ($filteredContracts.Count -gt 0) {
+                Write-Host "✓ Found $($filteredContracts.Count) client-level contract(s) (Priority 2)"
+            }
+            else {
+                # PRIORITY 3: Try InternalWork contracts (site_id = -1)
+                Write-Host "No client-level contracts found, checking InternalWork..."
+                $filteredContracts = @($contractsArray | Where-Object {
+                        $isInternalWork = ($_.ref -like 'InternalWork' -and $_.site_id -eq -1)
+                        return $isInternalWork
+                    })
+                
+                if ($filteredContracts.Count -gt 0) {
+                    Write-Host "✓ Found $($filteredContracts.Count) InternalWork contract(s) for Aegis internal (Priority 3)"
+                }
+                else {
+                    # PRIORITY 4 (LAST RESORT): Try same client, different site
+                    Write-Host "No InternalWork found, checking same-client contracts (last resort)..."
+                    $filteredContracts = @($contractsArray | Where-Object {
+                            $matchesPattern = ($_.ref -like '*M' -or $_.ref -like '*MSA')
+                            # Any site_id that's not 0, -1, or null (different site under same client)
+                            $isDifferentSiteInClient = ($_.site_id -ne 0 -and $_.site_id -ne -1 -and $null -ne $_.site_id)
+                            return ($matchesPattern -and $isDifferentSiteInClient)
+                        })
+                    
+                    if ($filteredContracts.Count -gt 0) {
+                        Write-Host "⚠ Found $($filteredContracts.Count) contract(s) at different site(s) under same client (Priority 4 - Last Resort)"
+                    }
+                    else {
+                        $result.Reason = "No MSA, *M, *MSA, or InternalWork contract found for this client"
+                        Write-Host "⚠ $($result.Reason)"
+                        return $result
+                    }
+                }
+            }
         }
         
         # Step 3: Get the latest contract
