@@ -312,7 +312,13 @@ function Get-ContractTicketingDecision {
         $result.DeviceType = $deviceType
         
         # Step 2: Ensure $Contracts is always an array to avoid .Count property errors
-        $contractsArray = @($Contracts)
+        # Handle null, empty, and single-object cases
+        if ($null -eq $Contracts -or $Contracts.Count -eq 0) {
+            $contractsArray = @()
+        }
+        else {
+            $contractsArray = @($Contracts)
+        }
         
         # Filter contracts by site and ref pattern
         Write-Host "Filtering $($contractsArray.Count) contracts for site ID $HaloSiteID"
@@ -326,19 +332,24 @@ function Get-ContractTicketingDecision {
         Write-Host "=== END DEBUG ==="
         
         $filteredContracts = @($contractsArray | Where-Object {
-                $matchesPattern = ($_.ref -like '*M' -or $_.ref -like 'InternalWork')
+                # Match contracts ending with M, MSA, or containing InternalWork
+                # Examples: "MSA - OKA01/01M", "LRG01/01/02/03MSA", "InternalWork"
+                $matchesPattern = ($_.ref -like '*M' -or $_.ref -like '*MSA' -or $_.ref -like 'InternalWork')
                 $isClientLevel = ($_.site_id -eq 0 -or $null -eq $_.site_id)
+                $isInternalWork = ($_.ref -like 'InternalWork' -and $_.site_id -eq -1)
                 $matchesSite = ($_.site_id -eq $HaloSiteID)
                 
-                # Match if: correct pattern AND (site-specific OR client-level)
+                # Match if: 
+                # 1. InternalWork contract (site_id = -1) - for Aegis internal team work
+                # 2. Correct pattern AND (site-specific OR client-level)
                 # Client-level contracts (site_id = 0) apply to all sites under that client
-                return ($matchesPattern -and ($matchesSite -or $isClientLevel))
+                return ($isInternalWork -or ($matchesPattern -and ($matchesSite -or $isClientLevel)))
             })
         
-        Write-Host "Found $($filteredContracts.Count) MSA/*M contracts (including client-level)"
+        Write-Host "Found $($filteredContracts.Count) MSA/*M/*MSA/InternalWork contracts (including client-level and Aegis internal)"
         
         if ($filteredContracts.Count -eq 0) {
-            $result.Reason = "No MSA or *M contract found for this site"
+            $result.Reason = "No MSA, *M, or *MSA contract found for this site"
             Write-Host "⚠ $($result.Reason)"
             return $result
         }

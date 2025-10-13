@@ -212,11 +212,20 @@ try {
     # Retrieve contracts with full objects to get custom fields (CFDevicesSupported)
     try {
         $Contracts = Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects
+        
+        # Ensure $Contracts is always an array, even if null or single object returned
+        if ($null -eq $Contracts) {
+            $Contracts = @()
+        }
+        elseif ($Contracts -isnot [array]) {
+            $Contracts = @($Contracts)
+        }
+        
         Write-Host "Contracts for client ID - $($Contracts.Count) contracts found"
     }
     catch {
         Write-Warning "Error retrieving contracts: $($_.Exception.Message)"
-        # Use default site if contract lookup fails
+        # Use empty array if contract lookup fails
         $Contracts = @()
     }
 
