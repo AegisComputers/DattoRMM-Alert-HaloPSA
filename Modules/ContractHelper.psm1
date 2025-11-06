@@ -46,6 +46,8 @@ function Get-DeviceTypeFromAlert {
                 $deviceTypeCategory = $DattoDevice.deviceType.category.Trim()
             }
         }
+
+        write-Host "Datto deviceType.category: $deviceTypeCategory"
         
         if ($deviceTypeCategory -and $deviceTypeCategory -ne "") {
             Write-Host "Datto deviceType.category: $deviceTypeCategory"

@@ -127,10 +127,14 @@ try {
 
     $HaloDevice = Invoke-HaloReport -Report $HaloDeviceReport -IncludeReport | where-object { $_.DDattoID -eq $Alert.alertSourceInfo.deviceUid }
 
+    $drmmDevice = Get-DrmmDevice -deviceUid $Alert.alertSourceInfo.deviceUid
+
+    $drmmDeviceType = $drmmDevice.deviceType.category
+
     # Create DattoDevice object for contract validation from alert data
     $DattoDevice = @{
         deviceUid  = $Alert.alertSourceInfo.deviceUid
-        deviceType = $Alert.alertSourceInfo.deviceType
+        deviceType = $drmmDeviceType
         hostname   = $Alert.alertSourceInfo.deviceName
     }
     Write-Host "Datto Device Info - UID: $($DattoDevice.deviceUid), Type: $($DattoDevice.deviceType), Hostname: $($DattoDevice.hostname)"
