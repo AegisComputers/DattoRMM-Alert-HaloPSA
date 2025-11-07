@@ -356,15 +356,18 @@ function Get-ContractTicketingDecision {
                 Write-Host "✓ Found $($filteredContracts.Count) client-level contract(s) (Priority 2)"
             }
             else {
-                # PRIORITY 3: Try InternalWork contracts (site_id = -1)
-                Write-Host "No client-level contracts found, checking InternalWork..."
+                # PRIORITY 3: Try site_id = -1 contracts (InternalWork or MSA/M contracts marked as internal)
+                Write-Host "No client-level contracts found, checking site_id=-1 contracts..."
                 $filteredContracts = @($contractsArray | Where-Object {
-                        $isInternalWork = ($_.ref -like 'InternalWork' -and $_.site_id -eq -1)
-                        return $isInternalWork
+                        # Match ANY contract with site_id = -1, regardless of ref pattern
+                        # This includes both InternalWork AND MSA/*M contracts at the internal level
+                        $matchesPattern = ($_.ref -like '*M' -or $_.ref -like '*MSA' -or $_.ref -like 'InternalWork')
+                        $isInternalSite = ($_.site_id -eq -1)
+                        return ($matchesPattern -and $isInternalSite)
                     })
                 
                 if ($filteredContracts.Count -gt 0) {
-                    Write-Host "✓ Found $($filteredContracts.Count) InternalWork contract(s) for Aegis internal (Priority 3)"
+                    Write-Host "✓ Found $($filteredContracts.Count) contract(s) with site_id=-1 (Priority 3)"
                 }
                 else {
                     # PRIORITY 4 (LAST RESORT): Try same client, different site
