@@ -251,6 +251,84 @@ try {
     Write-Host "  Charge Rate: $(if($null -eq $contractDecision.ChargeRate){'Use Contract Rate'}else{$contractDecision.ChargeRate})"
     Write-Host "  Reason: $($contractDecision.Reason)"
 
+    # === NEW: Customer Alert Routing Check ===
+    # Check if this alert should be routed to customer instead of creating a ticket
+    $customerRoutingEnabled = Get-AlertingConfig -Path "CustomerAlertRouting.EnableRouting" -DefaultValue $false
+    
+    if ($customerRoutingEnabled -and -not $Request.Body.resolvedAlert) {
+        Write-Host "=== Checking Customer Alert Routing ==="
+        
+        # Get customer name from Halo client
+        $customerName = $DattoCustomer
+        
+        # Determine alert severity from priority
+        $alertSeverity = $alertPriority
+        
+        # Check if this alert should be routed to customer
+        $routingDecision = Test-ShouldRouteToCustomer `
+            -CustomerName $customerName `
+            -AlertType $Alert.alertContext `
+            -AlertSeverity $alertSeverity `
+            -DeviceType $contractDecision.DeviceType
+        
+        if ($routingDecision.ShouldRoute) {
+            Write-Host "✓ Alert will be routed to customer email: $($routingDecision.CustomerEmail)"
+            
+            # Generate customer-friendly email
+            $customerEmailBody = New-CustomerAlertEmail `
+                -Alert $Alert `
+                -AlertMessage $Request.Body.alertMessage `
+                -DeviceName $Alert.alertSourceInfo.deviceName `
+                -AlertType $ParsedAlertType
+            
+            $subjectPrefix = Get-AlertingConfig -Path "CustomerAlertRouting.EmailSubjectPrefix" -DefaultValue "System Alert:"
+            $customerEmailSubject = "$subjectPrefix $ParsedAlertType - $($Alert.alertSourceInfo.deviceName)"
+            
+            # Send alert to customer and create tracking ticket
+            $routingResult = Send-AlertToCustomer `
+                -CustomerEmail $routingDecision.CustomerEmail `
+                -EmailSubject $customerEmailSubject `
+                -EmailBody $customerEmailBody `
+                -HaloTicketCreate $HaloTicketCreate `
+                -AlertUID $Request.Body.alertUID `
+                -CustomerName $customerName
+            
+            if ($routingResult.Success) {
+                Write-Host "✓ Alert successfully routed to customer. Tracking ticket: $($routingResult.TicketId)"
+                
+                # Set success response and skip normal ticket creation
+                $responseToSend = @{
+                    StatusCode = [HttpStatusCode]::OK
+                    Body       = "Alert routed to customer: $($routingDecision.CustomerEmail)"
+                }
+                
+                # Performance logging
+                $endTime = Get-Date
+                $totalDuration = New-TimeSpan -Start $startTime -End $endTime
+                Write-Host "Total processing time (customer routing): $($totalDuration.TotalSeconds) seconds"
+                
+                # Exit the try block early - don't create normal ticket
+                Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+                    StatusCode = $responseToSend.StatusCode
+                    Body       = $responseToSend.Body
+                })
+                return
+            }
+            else {
+                Write-Warning "Customer routing failed: $($routingResult.Message). Falling back to normal ticket creation."
+            }
+        }
+        else {
+            Write-Host "✗ Alert will be processed normally (reason: $($routingDecision.Reason))"
+        }
+    }
+    elseif ($customerRoutingEnabled -and $Request.Body.resolvedAlert) {
+        Write-Host "Customer routing check skipped (resolved alert)"
+    }
+    else {
+        Write-Host "Customer alert routing is disabled in configuration"
+    }
+
     $HaloTicketCreate = @{
         summary          = $TicketSubject
         tickettype_id    = $contractDecision.TicketTypeId  # Dynamic based on contract eligibility

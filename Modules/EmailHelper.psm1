@@ -324,5 +324,172 @@ function Send-PatchFailureUserEmail {
     }
 }
 
+<#
+.SYNOPSIS
+Sends an alert directly to a customer email address and creates a zero-charge ticket in Halo.
+
+.DESCRIPTION
+This function is used when alerts should be forwarded to customers instead of being handled
+internally. It sends a customer-friendly email and creates a closed ticket in Halo with 0 charge
+for record-keeping purposes.
+
+.PARAMETER CustomerEmail
+The email address to send the alert to.
+
+.PARAMETER EmailSubject
+The subject line for the customer email.
+
+.PARAMETER EmailBody
+The HTML body content for the customer email.
+
+.PARAMETER HaloTicketCreate
+The Halo ticket creation hashtable (used to create the zero-charge tracking ticket).
+
+.PARAMETER AlertUID
+The Datto alert UID for tracking purposes.
+
+.PARAMETER CustomerName
+The customer/client name for logging.
+
+.RETURNS
+Hashtable with Success (bool), TicketId (int or null), and Message (string)
+
+.EXAMPLE
+$result = Send-AlertToCustomer -CustomerEmail "alerts@acme.com" -EmailSubject "Disk Space Alert" -EmailBody $body -HaloTicketCreate $ticketData -AlertUID "12345" -CustomerName "Acme Corp"
+#>
+function Send-AlertToCustomer {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string]$CustomerEmail,
+
+        [Parameter(Mandatory)]
+        [string]$EmailSubject,
+
+        [Parameter(Mandatory)]
+        [string]$EmailBody,
+
+        [Parameter(Mandatory)]
+        [hashtable]$HaloTicketCreate,
+
+        [Parameter(Mandatory)]
+        [string]$AlertUID,
+
+        [Parameter(Mandatory)]
+        [string]$CustomerName
+    )
+
+    try {
+        Write-Host "=== Routing Alert to Customer: $CustomerName ==="
+        Write-Host "Customer Email: $CustomerEmail"
+        Write-Host "Alert UID: $AlertUID"
+
+        # Step 1: Create a tracking ticket in Halo (closed with 0 charge)
+        # Modify the ticket to indicate it was forwarded to customer
+        $trackingTicket = $HaloTicketCreate.Clone()
+        $trackingTicket.summary = "[Forwarded to Customer] $($trackingTicket.summary)"
+        $trackingTicket.details_html = @"
+<p><strong>This alert was forwarded directly to the customer.</strong></p>
+<p><strong>Customer Email:</strong> $CustomerEmail</p>
+<p><strong>Alert UID:</strong> $AlertUID</p>
+<hr>
+$EmailBody
+"@
+        
+        # Set ticket to closed status with 0 charge
+        $trackingTicket.status_id = 9  # Closed
+        $trackingTicket.ticket_type_id = Get-AlertingConfig -Path "TicketDefaults.NonContractTicketTypeId" -DefaultValue 9
+        
+        # Create the tracking ticket
+        Write-Host "Creating tracking ticket in Halo (closed, 0 charge)..."
+        $createdTicket = New-HaloTicket -Ticket $trackingTicket
+        
+        if (-not $createdTicket -or -not $createdTicket.id) {
+            Write-Warning "Failed to create tracking ticket in Halo"
+            $ticketId = $null
+        }
+        else {
+            $ticketId = $createdTicket.id
+            Write-Host "✓ Created tracking ticket ID: $ticketId"
+            
+            # Add an action with 0 charge to document the email was sent
+            try {
+                $dateArrival = (Get-Date).AddMinutes(-1)
+                $dateEnd = Get-Date
+                
+                $actionData = @{
+                    ticket_id            = $ticketId
+                    outcome              = "Email Customer"
+                    outcome_id           = 72
+                    note_html            = "<p>Alert forwarded to customer at: <strong>$CustomerEmail</strong></p><p>Customer routing rule matched for this alert type.</p>"
+                    actionarrivaldate    = $dateArrival
+                    actioncompletiondate = $dateEnd
+                    timetaken            = 0.016314166666666668  # 1 minute
+                    chargerate           = 0  # Zero charge
+                    sendemail            = $false
+                    emailto              = $CustomerEmail
+                }
+                
+                $null = New-HaloAction -Action $actionData
+                Write-Host "✓ Added zero-charge action to tracking ticket"
+            }
+            catch {
+                Write-Warning "Failed to add action to tracking ticket: $($_.Exception.Message)"
+            }
+        }
+
+        # Step 2: Send the email directly to the customer
+        Write-Host "Sending alert email to customer..."
+        
+        try {
+            # Use Halo's email system if we have a ticket, otherwise would need SendGrid/SMTP
+            if ($ticketId) {
+                # Send via Halo action (already done above with sendemail flag)
+                # Update the action to actually send the email
+                $emailAction = @{
+                    ticket_id    = $ticketId
+                    outcome      = "Email Customer"
+                    outcome_id   = 72
+                    note_html    = $EmailBody
+                    emailto      = $CustomerEmail
+                    emailsubject = $EmailSubject
+                    sendemail    = $true
+                }
+                
+                $null = New-HaloAction -Action $emailAction
+                Write-Host "✓ Email sent to customer via Halo"
+            }
+            else {
+                Write-Warning "No ticket ID available - email not sent (would require direct SMTP/SendGrid configuration)"
+            }
+        }
+        catch {
+            Write-Warning "Error sending email to customer: $($_.Exception.Message)"
+            # Don't fail the entire operation - ticket was created
+        }
+
+        # Return success result
+        $result = @{
+            Success  = $true
+            TicketId = $ticketId
+            Message  = "Alert successfully routed to customer $CustomerName at $CustomerEmail"
+        }
+        
+        Write-Host "✓ Alert routing complete"
+        return $result
+    }
+    catch {
+        Write-Error "Error routing alert to customer: $($_.Exception.Message)"
+        
+        $result = @{
+            Success  = $false
+            TicketId = $null
+            Message  = "Failed to route alert to customer: $($_.Exception.Message)"
+        }
+        
+        return $result
+    }
+}
+
 # Exporting Module Members
-Export-ModuleMember -Function Get-HaloUserEmail, Send-HaloEmailResponse, Send-HaloUserResponse, Send-PatchFailureUserEmail
+Export-ModuleMember -Function Get-HaloUserEmail, Send-HaloEmailResponse, Send-HaloUserResponse, Send-PatchFailureUserEmail, Send-AlertToCustomer

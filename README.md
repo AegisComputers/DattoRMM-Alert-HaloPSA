@@ -6,6 +6,8 @@ This repository contains a script that takes **Datto RMM Alert Webhooks** and se
 ## Features
 
 - **Webhook Integration:** Automatically sends Datto RMM alerts to Halo PSA, simplifying alert management and ticket creation.
+- **Customer Alert Routing:** NEW! Forward specific alerts directly to customers via email instead of creating helpdesk tickets (configurable per customer with 0 charge tracking tickets).
+- **Contract-Based Ticketing:** Automatically determines ticket types and charge rates based on customer contracts and device eligibility.
 - **Customization Options:** Support for custom fields and ticket types in Halo.
 - **Flexible Configuration:** Various variables can be customized, including Datto and Halo API credentials, ticket types, and webhook URL.
 - **Azure Deployment:** The solution can be deployed on Azure, allowing for easy cloud integration and scalability.
@@ -100,3 +102,22 @@ If you encounter issues, the easiest way to debug is to use **Visual Studio Code
 
 > [!IMPORTANT]
 > If you notice frequent errors in the logs, consider reviewing your Azure Function's permissions and the configuration of your Datto and Halo APIs, as improper settings could prevent the function from executing correctly.
+
+## Customer Alert Routing
+
+This project now supports **routing alerts directly to customers** via email instead of creating helpdesk tickets. This is ideal for low-priority alerts that customers can handle themselves.
+
+**Key Features:**
+- Configure per-customer email routing rules via Azure App Settings (no redeployment needed)
+- Filter by alert type, severity, and device type
+- Creates closed tracking tickets in Halo with **0 charge** for audit purposes
+- Customer-friendly email templates with actionable recommendations
+
+**Quick Start:**
+1. See `Docs/CustomerAlertRouting-QuickStart.md` for copy-paste Azure configuration templates
+2. See `Docs/CustomerAlertRoutingGuide.md` for complete documentation
+
+**Example Use Cases:**
+- Route disk space alerts to customers for self-service cleanup
+- Send patch failure notifications with manual update instructions
+- Forward non-critical PC alerts while keeping server alerts internal

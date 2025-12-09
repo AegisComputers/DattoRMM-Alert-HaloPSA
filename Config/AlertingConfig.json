@@ -78,6 +78,14 @@
             "SupportPhone": "01865 393760"
         }
     },
+    "CustomerAlertRouting": {
+        "EnableRouting": false,
+        "EmailSubjectPrefix": "System Alert:",
+        "EmailFromName": "IT Monitoring System",
+        "CreateTrackingTickets": true,
+        "TrackingTicketStatusId": 9,
+        "EmailTemplate": "<html><head><style>body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; } .alert-box { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; } .alert-box.critical { background-color: #f8d7da; border-left-color: #dc3545; } .alert-box.warning { background-color: #fff3cd; border-left-color: #ffc107; } .alert-box.info { background-color: #d1ecf1; border-left-color: #17a2b8; } .device-info { background-color: #f8f9fa; padding: 10px; margin: 15px 0; border-radius: 5px; } .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; } h2 { color: #0066cc; } strong { color: #000; }</style></head><body><h2>System Alert Notification</h2><div class='alert-box {SEVERITY_CLASS}'><strong>Alert Type:</strong> {ALERT_TYPE}<br><strong>Severity:</strong> {SEVERITY}<br><strong>Device:</strong> {DEVICE_NAME}</div><h3>Alert Details</h3><p>{ALERT_MESSAGE}</p><div class='device-info'><strong>Affected System:</strong> {DEVICE_NAME}<br><strong>Alert Time:</strong> {ALERT_TIME}</div><h3>What This Means</h3><p>Our monitoring system has detected an issue that may require attention. {ACTION_REQUIRED}</p><h3>Recommended Action</h3><p>{RECOMMENDED_ACTION}</p><div class='footer'><p>This is an automated alert from your IT monitoring system. If you need assistance, please contact your IT support team.</p><p><em>Alert ID: {ALERT_UID}</em></p></div></body></html>"
+    },
     "WindowsErrorCodes": {
         "0x80240022": "WU_E_ALL_UPDATES_FAILED: Operation failed for all updates.",
         "0x80070005": "E_ACCESSDENIED: Access Denied, insufficient permissions.",
