@@ -4,6 +4,45 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Convert-CustomerRoutingObjectToHashtable {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [PSObject]$RoutingConfigObject
+    )
+
+    $configHashtable = @{}
+
+    foreach ($property in $RoutingConfigObject.PSObject.Properties) {
+        $customerName = $property.Name
+        $customerConfig = $property.Value
+
+        $clientIds = @()
+        if ($customerConfig.clientIds) {
+            $clientIds = @($customerConfig.clientIds | ForEach-Object { "$_" })
+        }
+        elseif ($null -ne $customerConfig.clientId) {
+            $clientIds = @("$($customerConfig.clientId)")
+        }
+
+        $customerHashtable = @{
+            email              = $customerConfig.email
+            enabled            = if ($null -ne $customerConfig.enabled) { [bool]$customerConfig.enabled } else { $true }
+            alertTypes         = if ($customerConfig.alertTypes) { @($customerConfig.alertTypes) } else { @() }
+            excludeAlertTypes  = if ($customerConfig.excludeAlertTypes) { @($customerConfig.excludeAlertTypes) } else { @() }
+            severityThreshold  = if ($customerConfig.severityThreshold) { $customerConfig.severityThreshold } else { "Low" }
+            excludeDeviceTypes = if ($customerConfig.excludeDeviceTypes) { @($customerConfig.excludeDeviceTypes) } else { @() }
+            includeAllAlerts   = if ($null -ne $customerConfig.includeAllAlerts) { [bool]$customerConfig.includeAllAlerts } else { $false }
+            clientId           = if ($null -ne $customerConfig.clientId) { "$($customerConfig.clientId)" } else { $null }
+            clientIds          = $clientIds
+        }
+
+        $configHashtable[$customerName] = $customerHashtable
+    }
+
+    return $configHashtable
+}
+
 function Get-CustomerAlertRoutingConfig {
     <#
     .SYNOPSIS
@@ -51,33 +90,24 @@ function Get-CustomerAlertRoutingConfig {
         $routingConfigJson = $env:CUSTOMER_ALERT_ROUTING
         
         if ([string]::IsNullOrWhiteSpace($routingConfigJson)) {
-            Write-Host "No customer alert routing configuration found (CUSTOMER_ALERT_ROUTING not set)"
-            return @{}
+            Write-Host "CUSTOMER_ALERT_ROUTING not set - checking AlertingConfig.json fallback at CustomerAlertRouting.RoutingRules"
+
+            $routingConfigFromFile = Get-AlertingConfig -Path "CustomerAlertRouting.RoutingRules" -DefaultValue $null
+            if ($null -eq $routingConfigFromFile) {
+                Write-Host "No customer alert routing configuration found in env var or AlertingConfig.json fallback"
+                return @{}
+            }
+
+            $configHashtable = Convert-CustomerRoutingObjectToHashtable -RoutingConfigObject $routingConfigFromFile
+            Write-Host "Loaded customer alert routing fallback configuration for $($configHashtable.Count) customer(s)"
+            return $configHashtable
         }
         
         # Parse the JSON configuration
         $routingConfig = $routingConfigJson | ConvertFrom-Json
-        
+
         # Convert PSCustomObject to hashtable for easier access
-        $configHashtable = @{}
-        
-        foreach ($property in $routingConfig.PSObject.Properties) {
-            $customerName = $property.Name
-            $customerConfig = $property.Value
-            
-            # Convert customer config to hashtable
-            $customerHashtable = @{
-                email              = $customerConfig.email
-                enabled            = if ($null -ne $customerConfig.enabled) { [bool]$customerConfig.enabled } else { $true }
-                alertTypes         = if ($customerConfig.alertTypes) { @($customerConfig.alertTypes) } else { @() }
-                excludeAlertTypes  = if ($customerConfig.excludeAlertTypes) { @($customerConfig.excludeAlertTypes) } else { @() }
-                severityThreshold  = if ($customerConfig.severityThreshold) { $customerConfig.severityThreshold } else { "Low" }
-                excludeDeviceTypes = if ($customerConfig.excludeDeviceTypes) { @($customerConfig.excludeDeviceTypes) } else { @() }
-                includeAllAlerts   = if ($null -ne $customerConfig.includeAllAlerts) { [bool]$customerConfig.includeAllAlerts } else { $false }
-            }
-            
-            $configHashtable[$customerName] = $customerHashtable
-        }
+        $configHashtable = Convert-CustomerRoutingObjectToHashtable -RoutingConfigObject $routingConfig
         
         Write-Host "Loaded customer alert routing configuration for $($configHashtable.Count) customer(s)"
         return $configHashtable
@@ -125,6 +155,9 @@ function Test-ShouldRouteToCustomer {
     param(
         [Parameter(Mandatory)]
         [string]$CustomerName,
+
+        [Parameter()]
+        [string]$ClientId,
         
         [Parameter(Mandatory)]
         [string]$AlertType,
@@ -153,29 +186,64 @@ function Test-ShouldRouteToCustomer {
         }
         
         # Check if this customer has routing configured
-        $customerConfig = $routingConfig[$CustomerName]
+        $customerConfig = $null
+        $matchedConfigKey = $CustomerName
+        $matchedBy = "customer name"
+
+        if (-not [string]::IsNullOrWhiteSpace($CustomerName) -and $routingConfig.ContainsKey($CustomerName)) {
+            $customerConfig = $routingConfig[$CustomerName]
+        }
+
+        # Fallback matching by client ID
+        if (-not $customerConfig -and -not [string]::IsNullOrWhiteSpace($ClientId)) {
+            if ($routingConfig.ContainsKey($ClientId)) {
+                $customerConfig = $routingConfig[$ClientId]
+                $matchedConfigKey = $ClientId
+                $matchedBy = "client ID key"
+            }
+            else {
+                foreach ($entry in $routingConfig.GetEnumerator()) {
+                    $candidate = $entry.Value
+                    $candidateClientId = if ($null -ne $candidate.clientId) { "$($candidate.clientId)" } else { $null }
+                    $candidateClientIds = if ($candidate.clientIds) { @($candidate.clientIds | ForEach-Object { "$_" }) } else { @() }
+
+                    if (($candidateClientId -eq $ClientId) -or ($candidateClientIds -contains $ClientId)) {
+                        $customerConfig = $candidate
+                        $matchedConfigKey = $entry.Key
+                        $matchedBy = "client ID field"
+                        break
+                    }
+                }
+            }
+        }
         
         if (-not $customerConfig) {
-            $result.Reason = "No routing configured for customer '$CustomerName'"
-            Write-Host "No routing rule found for customer: $CustomerName"
+            if (-not [string]::IsNullOrWhiteSpace($ClientId)) {
+                $result.Reason = "No routing configured for customer '$CustomerName' or client ID '$ClientId'"
+                Write-Host "No routing rule found for customer '$CustomerName' or client ID '$ClientId'"
+            }
+            else {
+                $result.Reason = "No routing configured for customer '$CustomerName'"
+                Write-Host "No routing rule found for customer: $CustomerName"
+            }
             return $result
         }
         
         # Check if routing is enabled for this customer
         if (-not $customerConfig.enabled) {
-            $result.Reason = "Routing is disabled for customer '$CustomerName'"
-            Write-Host "Routing disabled for customer: $CustomerName"
+            $result.Reason = "Routing is disabled for customer '$matchedConfigKey'"
+            Write-Host "Routing disabled for matched config '$matchedConfigKey' ($matchedBy)"
             return $result
         }
         
         # Validate email address exists
         if ([string]::IsNullOrWhiteSpace($customerConfig.email)) {
-            $result.Reason = "No email address configured for customer '$CustomerName'"
-            Write-Warning "Customer routing enabled but no email configured for: $CustomerName"
+            $result.Reason = "No email address configured for customer '$matchedConfigKey'"
+            Write-Warning "Customer routing enabled but no email configured for: $matchedConfigKey"
             return $result
         }
         
-        Write-Host "=== Customer Alert Routing Check for '$CustomerName' ==="
+        Write-Host "=== Customer Alert Routing Check for '$matchedConfigKey' ($matchedBy) ==="
         Write-Host "Alert Type: $AlertType | Severity: $AlertSeverity | Device: $DeviceType"
         
         # Check if this is an "includeAllAlerts" customer (route everything)

@@ -46,9 +46,9 @@ try {
     $DattoAlertUIDField = $env:DattoAlertUIDField
 
     $paramsDatto = @{
-       Url       = $DattoURL
-       Key       = $DattoKey
-       SecretKey = $DattoSecretKey
+        Url       = $DattoURL
+        Key       = $DattoKey
+        SecretKey = $DattoSecretKey
     }
 
     # Check if DattoRMM module is available before setting parameters
@@ -56,11 +56,13 @@ try {
         if (Get-Command Set-DrmmApiParameters -ErrorAction SilentlyContinue) {
             Set-DrmmApiParameters @paramsDatto
             Write-Host "Datto RMM API parameters set successfully"
-        } else {
+        }
+        else {
             Write-Warning "DattoRMM module not available. Set-DrmmApiParameters command not found."
             throw "DattoRMM module is required but not loaded. Please check requirements.psd1 and module installation."
         }
-    } catch {
+    }
+    catch {
         Write-Error "Failed to configure DattoRMM API: $($_.Exception.Message)"
         throw
     }
@@ -86,7 +88,8 @@ try {
         $PriorityMapConfig.PSObject.Properties | ForEach-Object {
             $PriorityHaloMap[$_.Name] = $_.Value
         }
-    } else {
+    }
+    else {
         $PriorityHaloMap = $PriorityMapConfig
     }
 
@@ -111,7 +114,8 @@ try {
             # Safe indexing for PSObject compatibility
             $HaloDeviceReport = if ($ExistingDeviceReports -is [array]) { $ExistingDeviceReports[0] } else { $ExistingDeviceReports }
             Write-Host "Using existing Device Report with ID: $($HaloDeviceReport.id)"
-        } else {
+        }
+        else {
             $HaloDeviceReport = @{
                 name                    = "Datto RMM Improved Alerts PowerShell Function - Device Report"
                 sql                     = "Select did, Dsite, DDattoID, DDattoAlternateId from device"
@@ -123,435 +127,454 @@ try {
             $HaloDeviceReport = New-HaloReport -Report $HaloDeviceReport
             Write-Host "Created new Device Report with ID: $($HaloDeviceReport.id)"
         }
-    $ParsedAlertType = Get-AlertHaloType -Alert $Alert -AlertMessage $AlertWebhook.alertMessage
+        $ParsedAlertType = Get-AlertHaloType -Alert $Alert -AlertMessage $AlertWebhook.alertMessage
 
-    $HaloDevice = Invoke-HaloReport -Report $HaloDeviceReport -IncludeReport | where-object { $_.DDattoID -eq $Alert.alertSourceInfo.deviceUid }
+        $HaloDevice = Invoke-HaloReport -Report $HaloDeviceReport -IncludeReport | where-object { $_.DDattoID -eq $Alert.alertSourceInfo.deviceUid }
 
-    $drmmDevice = Get-DrmmDevice -deviceUid $Alert.alertSourceInfo.deviceUid
+        $drmmDevice = Get-DrmmDevice -deviceUid $Alert.alertSourceInfo.deviceUid
 
-    $drmmDeviceType = $drmmDevice.deviceType.category
+        $drmmDeviceType = $drmmDevice.deviceType.category
 
-    # Create DattoDevice object for contract validation from alert data
-    $DattoDevice = @{
-        deviceUid  = $Alert.alertSourceInfo.deviceUid
-        deviceType = $drmmDeviceType
-        hostname   = $Alert.alertSourceInfo.deviceName
-    }
-    Write-Host "Datto Device Info - UID: $($DattoDevice.deviceUid), Type: $($DattoDevice.deviceType), Hostname: $($DattoDevice.hostname)"
-
-    # Check if Alerts Report already exists, if not create it
-    $ExistingAlertsReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
-    if ($ExistingAlertsReports -and $ExistingAlertsReports.Count -gt 0) {
-        # Safe indexing for PSObject compatibility
-        $HaloAlertsReportBase = if ($ExistingAlertsReports -is [array]) { $ExistingAlertsReports[0] } else { $ExistingAlertsReports }
-        Write-Host "Using existing Alerts Report with ID: $($HaloAlertsReportBase.id)"
-    } else {
-        $HaloAlertsReportBase = @{
-            name                    = "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
-            sql                     = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, CFDattoAlertUID, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
-            description             = "This report is used to quickly obtain alert information for use with the improved Datto RMM Alerts Function"
-            type                    = 0
-            datasource_id           = 0
-            canbeaccessedbyallusers = $false
+        # Create DattoDevice object for contract validation from alert data
+        $DattoDevice = @{
+            deviceUid  = $Alert.alertSourceInfo.deviceUid
+            deviceType = $drmmDeviceType
+            hostname   = $Alert.alertSourceInfo.deviceName
         }
-        $HaloAlertsReportBase = New-HaloReport -Report $HaloAlertsReportBase
-        Write-Host "Created new Alerts Report with ID: $($HaloAlertsReportBase.id)"
-    }
+        Write-Host "Datto Device Info - UID: $($DattoDevice.deviceUid), Type: $($DattoDevice.deviceType), Hostname: $($DattoDevice.hostname)"
 
-    # Capture the subject of the email alert
-    $TicketSubject = $Email.Subject
-
-    # Capture the body content of the email alert in HTML format
-    $HTMLBody = $Email.Body
-    
-    # Handle large HTML content intelligently to preserve critical data
-    $MaxBodyLength = Get-AlertingConfig -Path "AlertThresholds.HtmlBodyMaxLength" -DefaultValue 3000000
-    $OriginalBodyLength = $HTMLBody.Length
-    
-    if ($OriginalBodyLength -gt $MaxBodyLength) {
-        Write-Host "HTML body is large ($OriginalBodyLength characters). Optimizing for API transmission..."
-        
-        # Use helper function to optimize HTML content
-        $HTMLBody = Optimize-HtmlContentForTicket -OriginalHtml $HTMLBody -MaxLength $MaxBodyLength -Request $Request -TicketSubject $TicketSubject
-        
-        Write-Host "Final HTML body size: $($HTMLBody.Length) characters (reduced from $OriginalBodyLength)"
-    }
-
-    # Map the priority of the alert to the corresponding Halo priority using the priority mapping
-    $alertPriority = if ($Alert.Priority) { $Alert.Priority.ToString() } else { "Information" }
-    $HaloPriority = $PriorityHaloMap[$alertPriority]
-    if (-not $HaloPriority) {
-        $HaloPriority = $PriorityHaloMap["Information"] # Default fallback
-    }
-
-    # Retrieve the site details from the request body (Datto site details)
-    $RSiteDetails = $Request.Body.dattoSiteDetails
-
-    # Find the Halo site ID associated with the Datto site name provided in the site details
-    $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
-
-    Write-Host ("Found Halo site with ID - $($HaloSiteIDDatto)")
-
-    # Store the Datto site details from the request body into a variable
-    $dattoLookupString = $Request.Body.dattoSiteDetails
-
-    #Process based on naming scheme in Datto <site>(<Customer>)
-    $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
-    # Safe indexing for PSObject compatibility
-    $DattoCustomer = if ($dataSiteDetails -is [array] -and $dataSiteDetails.Count -gt 1) { $dataSiteDetails[1] } else { "Unknown" }
-    
-    # Safe client lookup with error handling
-    try {
-        $HaloClients = Get-HaloClient -Search $DattoCustomer
-        $HaloClientID = if ($HaloClients -is [array] -and $HaloClients.Count -gt 0) { $HaloClients[0].id } elseif ($HaloClients) { $HaloClients.id } else { $null }
-    } catch {
-        Write-Warning "Error getting Halo client: $($_.Exception.Message)"
-        $HaloClientID = $null
-    }
-
-    $HaloClientDattoMatch = $HaloClientID
-    
-    Write-Host "Client ID in Halo - $($HaloClientDattoMatch)"
-    
-    # Retrieve contracts with full objects to get custom fields (CFDevicesSupported)
-    try {
-        $Contracts = Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects
-        
-        # Ensure $Contracts is always an array, even if null or single object returned
-        if ($null -eq $Contracts) {
-            $Contracts = @()
-        }
-        elseif ($Contracts -isnot [array]) {
-            $Contracts = @($Contracts)
-        }
-        
-        Write-Host "Contracts for client ID - $($Contracts.Count) contracts found"
-    }
-    catch {
-        Write-Warning "Error retrieving contracts: $($_.Exception.Message)"
-        # Use empty array if contract lookup fails
-        $Contracts = @()
-    }
-
-    # === NEW: Contract-based Ticket Type Assignment ===
-    # Determine ticket type and charge rate based on contract eligibility and device type
-    $contractDecision = Get-ContractTicketingDecision `
-        -Contracts $Contracts `
-        -HaloSiteID $HaloSiteIDDatto `
-        -DattoDevice $DattoDevice `
-        -ClientID $HaloClientDattoMatch `
-        -ContractTicketTypeId (Get-AlertingConfig -Path "ContractManagement.ContractTicketTypeId" -DefaultValue 8) `
-        -NonContractTicketTypeId (Get-AlertingConfig -Path "ContractManagement.NonContractTicketTypeId" -DefaultValue 9)
-    
-    Write-Host "Contract Decision Summary:"
-    Write-Host "  Device Type: $($contractDecision.DeviceType)"
-    Write-Host "  Contract Found: $(if($contractDecision.ContractId){"Yes - $($contractDecision.ContractRef)"}else{"No"})"
-    Write-Host "  Device Eligible: $($contractDecision.IsEligible)"
-    Write-Host "  Ticket Type ID: $($contractDecision.TicketTypeId)"
-    Write-Host "  Charge Rate: $(if($null -eq $contractDecision.ChargeRate){'Use Contract Rate'}else{$contractDecision.ChargeRate})"
-    Write-Host "  Reason: $($contractDecision.Reason)"
-
-    # === NEW: Customer Alert Routing Check ===
-    # Check if this alert should be routed to customer instead of creating a ticket
-    $customerRoutingEnabled = Get-AlertingConfig -Path "CustomerAlertRouting.EnableRouting" -DefaultValue $false
-    
-    if ($customerRoutingEnabled -and -not $Request.Body.resolvedAlert) {
-        Write-Host "=== Checking Customer Alert Routing ==="
-        
-        # Get customer name from Halo client
-        $customerName = $DattoCustomer
-        
-        # Determine alert severity from priority
-        $alertSeverity = $alertPriority
-        
-        # Check if this alert should be routed to customer
-        $routingDecision = Test-ShouldRouteToCustomer `
-            -CustomerName $customerName `
-            -AlertType $Alert.alertContext `
-            -AlertSeverity $alertSeverity `
-            -DeviceType $contractDecision.DeviceType
-        
-        if ($routingDecision.ShouldRoute) {
-            Write-Host "✓ Alert will be routed to customer email: $($routingDecision.CustomerEmail)"
-            
-            # Generate customer-friendly email
-            $customerEmailBody = New-CustomerAlertEmail `
-                -Alert $Alert `
-                -AlertMessage $Request.Body.alertMessage `
-                -DeviceName $Alert.alertSourceInfo.deviceName `
-                -AlertType $ParsedAlertType
-            
-            $subjectPrefix = Get-AlertingConfig -Path "CustomerAlertRouting.EmailSubjectPrefix" -DefaultValue "System Alert:"
-            $customerEmailSubject = "$subjectPrefix $ParsedAlertType - $($Alert.alertSourceInfo.deviceName)"
-            
-            # Send alert to customer and create tracking ticket
-            $routingResult = Send-AlertToCustomer `
-                -CustomerEmail $routingDecision.CustomerEmail `
-                -EmailSubject $customerEmailSubject `
-                -EmailBody $customerEmailBody `
-                -HaloTicketCreate $HaloTicketCreate `
-                -AlertUID $Request.Body.alertUID `
-                -CustomerName $customerName
-            
-            if ($routingResult.Success) {
-                Write-Host "✓ Alert successfully routed to customer. Tracking ticket: $($routingResult.TicketId)"
-                
-                # Set success response and skip normal ticket creation
-                $responseToSend = @{
-                    StatusCode = [HttpStatusCode]::OK
-                    Body       = "Alert routed to customer: $($routingDecision.CustomerEmail)"
-                }
-                
-                # Performance logging
-                $endTime = Get-Date
-                $totalDuration = New-TimeSpan -Start $startTime -End $endTime
-                Write-Host "Total processing time (customer routing): $($totalDuration.TotalSeconds) seconds"
-                
-                # Exit the try block early - don't create normal ticket
-                Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-                    StatusCode = $responseToSend.StatusCode
-                    Body       = $responseToSend.Body
-                })
-                return
-            }
-            else {
-                Write-Warning "Customer routing failed: $($routingResult.Message). Falling back to normal ticket creation."
-            }
+        # Check if Alerts Report already exists, if not create it
+        $ExistingAlertsReports = Get-HaloReport -Search "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
+        if ($ExistingAlertsReports -and $ExistingAlertsReports.Count -gt 0) {
+            # Safe indexing for PSObject compatibility
+            $HaloAlertsReportBase = if ($ExistingAlertsReports -is [array]) { $ExistingAlertsReports[0] } else { $ExistingAlertsReports }
+            Write-Host "Using existing Alerts Report with ID: $($HaloAlertsReportBase.id)"
         }
         else {
-            Write-Host "✗ Alert will be processed normally (reason: $($routingDecision.Reason))"
+            $HaloAlertsReportBase = @{
+                name                    = "Datto RMM Improved Alerts PowerShell Function - Alerts Report"
+                sql                     = "SELECT Faultid, Symptom, tstatusdesc, dateoccured, inventorynumber, FGFIAlertType, CFDattoAlertType, CFDattoAlertUID, fxrefto as ParentID, fcreatedfromid as RelatedID FROM FAULTS inner join TSTATUS on Status = Tstatus Where CFDattoAlertType is not null and fdeleted <> 1"
+                description             = "This report is used to quickly obtain alert information for use with the improved Datto RMM Alerts Function"
+                type                    = 0
+                datasource_id           = 0
+                canbeaccessedbyallusers = $false
+            }
+            $HaloAlertsReportBase = New-HaloReport -Report $HaloAlertsReportBase
+            Write-Host "Created new Alerts Report with ID: $($HaloAlertsReportBase.id)"
         }
-    }
-    elseif ($customerRoutingEnabled -and $Request.Body.resolvedAlert) {
-        Write-Host "Customer routing check skipped (resolved alert)"
-    }
-    else {
-        Write-Host "Customer alert routing is disabled in configuration"
-    }
 
-    $HaloTicketCreate = @{
-        summary          = $TicketSubject
-        tickettype_id    = $contractDecision.TicketTypeId  # Dynamic based on contract eligibility
-        details_html     = $HtmlBody
-        DattoAlertState  = 0
-        site_id          = $HaloSiteIDDatto
-        assets           = @(@{id = $HaloDevice.did })
-        priority_id      = $HaloPriority
-        status_id        = $HaloTicketStatusID
-        category_1       = Get-AlertingConfig -Path "TicketDefaults.Category1" -DefaultValue "Datto Alert"
-        customfields     = @(
-            @{
-                id    = $HaloCustomAlertTypeField
-                value = $ParsedAlertType
-            };
-            @{
-                id    = $DattoAlertUIDField
-                value = $Request.Body.alertUID
-            }
-        )
-    }
-    
-    # Only add contract_id if it's not null (for eligible devices)
-    if ($contractDecision.ContractId) {
-        $HaloTicketCreate.contract_id = $contractDecision.ContractId
-        Write-Host "Adding contract ID $($contractDecision.ContractId) to ticket"
-    }
-    else {
-        Write-Host "No contract ID added (non-contract ticket)"
-    }
-    
-    # Store contract decision for later use (e.g., in action creation)
-    $script:ContractDecision = $contractDecision
+        # Capture the subject of the email alert
+        $TicketSubject = $Email.Subject
 
-    # Check for existing ticket with this alert UID using the Alerts Report
-    $ticketidHalo = $null
-    $targetUID = $Request.Body.alertUID
+        # Capture the body content of the email alert in HTML format
+        $HTMLBody = $Email.Body
     
-    Write-Host "Searching for existing ticket with Alert UID: $targetUID"
+        # Handle large HTML content intelligently to preserve critical data
+        $MaxBodyLength = Get-AlertingConfig -Path "AlertThresholds.HtmlBodyMaxLength" -DefaultValue 3000000
+        $OriginalBodyLength = $HTMLBody.Length
     
-    # Use the Alerts Report to find tickets with matching CFDattoAlertUID
-    try {
-        $alertsFromReport = Invoke-HaloReport -Report $HaloAlertsReportBase -IncludeReport
-        Write-Host "Retrieved $($alertsFromReport.Count) alerts from report for UID search"
+        if ($OriginalBodyLength -gt $MaxBodyLength) {
+            Write-Host "HTML body is large ($OriginalBodyLength characters). Optimizing for API transmission..."
         
-        # Find tickets with matching CFDattoAlertUID that are still open (not status 9)
-        $matchingAlert = $alertsFromReport | Where-Object { 
-            $_.CFDattoAlertUID -eq $targetUID -and $_.tstatusdesc -ne "Closed"
+            # Use helper function to optimize HTML content
+            $HTMLBody = Optimize-HtmlContentForTicket -OriginalHtml $HTMLBody -MaxLength $MaxBodyLength -Request $Request -TicketSubject $TicketSubject
+        
+            Write-Host "Final HTML body size: $($HTMLBody.Length) characters (reduced from $OriginalBodyLength)"
         }
+
+        # Map the priority of the alert to the corresponding Halo priority using the priority mapping
+        $alertPriority = if ($Alert.Priority) { $Alert.Priority.ToString() } else { "Information" }
+        $HaloPriority = $PriorityHaloMap[$alertPriority]
+        if (-not $HaloPriority) {
+            $HaloPriority = $PriorityHaloMap["Information"] # Default fallback
+        }
+
+        # Retrieve the site details from the request body (Datto site details)
+        $RSiteDetails = $Request.Body.dattoSiteDetails
+
+        # Find the Halo site ID associated with the Datto site name provided in the site details
+        $HaloSiteIDDatto = Find-DattoAlertHaloSite -DattoSiteName ($RSiteDetails)
+
+        Write-Host ("Found Halo site with ID - $($HaloSiteIDDatto)")
+
+        # Store the Datto site details from the request body into a variable
+        $dattoLookupString = $Request.Body.dattoSiteDetails
+
+        #Process based on naming scheme in Datto <site>(<Customer>)
+        $dataSiteDetails = $dattoLookupString.Split("(").Split(")")
+        # Safe indexing for PSObject compatibility
+        $DattoCustomer = if ($dataSiteDetails -is [array] -and $dataSiteDetails.Count -gt 1) { $dataSiteDetails[1] } else { "Unknown" }
+    
+        # Safe client lookup with error handling
+        try {
+            $HaloClients = Get-HaloClient -Search $DattoCustomer
+            $HaloClientID = if ($HaloClients -is [array] -and $HaloClients.Count -gt 0) { $HaloClients[0].id } elseif ($HaloClients) { $HaloClients.id } else { $null }
+        }
+        catch {
+            Write-Warning "Error getting Halo client: $($_.Exception.Message)"
+            $HaloClientID = $null
+        }
+
+        $HaloClientDattoMatch = $HaloClientID
+    
+        Write-Host "Client ID in Halo - $($HaloClientDattoMatch)"
+    
+        # Retrieve contracts with full objects to get custom fields (CFDevicesSupported)
+        try {
+            $Contracts = Get-HaloContract -ClientID $HaloClientDattoMatch -FullObjects
         
-        if ($matchingAlert) {
-            $ticketidHalo = $matchingAlert.Faultid
-            Write-Host "Found matching open ticket with ID: $ticketidHalo (Status: $($matchingAlert.tstatusdesc))"
-            
-            # Add the "Resolved by Datto Automation" action
-            $dateArrival = (Get-Date).AddMinutes(-5)
-            $dateEnd = Get-Date
-            Write-Host "Adding resolution action - Arrival: $dateArrival, End: $dateEnd"
-            
-            # Build action with appropriate charge rate
-            $ActionUpdate = @{
-                ticket_id            = $ticketidHalo
-                actionid             = 23
-                outcome              = "Remote"
-                outcome_id           = 23
-                note                 = "Resolved by Datto Automation"
-                actionarrivaldate    = $dateArrival
-                actioncompletiondate = $dateEnd
-                action_isresponse    = $false
-                validate_response    = $false
-                sendemail            = $false
+            # Ensure $Contracts is always an array, even if null or single object returned
+            if ($null -eq $Contracts) {
+                $Contracts = @()
             }
-            
-            # Apply charge rate if this is a non-contract ticket
-            # Check if we have the contract decision from ticket creation
-            if ($script:ContractDecision -and $script:ContractDecision.ChargeRate -eq 0) {
-                $ActionUpdate.chargerate = 0
-                Write-Host "Applied charge rate 0 (non-contract ticket)"
+            elseif ($Contracts -isnot [array]) {
+                $Contracts = @($Contracts)
             }
-            elseif ($script:ContractDecision -and $script:ContractDecision.TicketTypeId -ne 8) {
-                # Non-contract ticket type - apply no charge
-                $ActionUpdate.chargerate = 0
-                Write-Host "Applied charge rate 0 (non-contract ticket type: $($script:ContractDecision.TicketTypeId))"
+        
+            Write-Host "Contracts for client ID - $($Contracts.Count) contracts found"
+        }
+        catch {
+            Write-Warning "Error retrieving contracts: $($_.Exception.Message)"
+            # Use empty array if contract lookup fails
+            $Contracts = @()
+        }
+
+        # === NEW: Contract-based Ticket Type Assignment ===
+        # Determine ticket type and charge rate based on contract eligibility and device type
+        $contractDecision = Get-ContractTicketingDecision `
+            -Contracts $Contracts `
+            -HaloSiteID $HaloSiteIDDatto `
+            -DattoDevice $DattoDevice `
+            -ClientID $HaloClientDattoMatch `
+            -ContractTicketTypeId (Get-AlertingConfig -Path "ContractManagement.ContractTicketTypeId" -DefaultValue 8) `
+            -NonContractTicketTypeId (Get-AlertingConfig -Path "ContractManagement.NonContractTicketTypeId" -DefaultValue 9)
+    
+        Write-Host "Contract Decision Summary:"
+        Write-Host "  Device Type: $($contractDecision.DeviceType)"
+        Write-Host "  Contract Found: $(if($contractDecision.ContractId){"Yes - $($contractDecision.ContractRef)"}else{"No"})"
+        Write-Host "  Device Eligible: $($contractDecision.IsEligible)"
+        Write-Host "  Ticket Type ID: $($contractDecision.TicketTypeId)"
+        Write-Host "  Charge Rate: $(if($null -eq $contractDecision.ChargeRate){'Use Contract Rate'}else{$contractDecision.ChargeRate})"
+        Write-Host "  Reason: $($contractDecision.Reason)"
+
+        # === NEW: Customer Alert Routing Check ===
+        # Check if this alert should be routed to customer instead of creating a ticket
+        $customerRoutingEnabled = Get-AlertingConfig -Path "CustomerAlertRouting.EnableRouting" -DefaultValue $false
+    
+        if ($customerRoutingEnabled -and -not $Request.Body.resolvedAlert) {
+            Write-Host "=== Checking Customer Alert Routing ==="
+        
+            # Get customer name from Halo client
+            $customerName = $DattoCustomer
+        
+            # Determine alert severity from priority
+            $alertSeverity = $alertPriority
+        
+            # Check if this alert should be routed to customer
+            $routingDecision = Test-ShouldRouteToCustomer `
+                -CustomerName $customerName `
+                -ClientId "$HaloClientDattoMatch" `
+                -AlertType $Alert.alertContext `
+                -AlertSeverity $alertSeverity `
+                -DeviceType $contractDecision.DeviceType
+        
+            if ($routingDecision.ShouldRoute) {
+                Write-Host "✓ Alert will be routed to customer email: $($routingDecision.CustomerEmail)"
+            
+                # Generate customer-friendly email
+                $customerEmailBody = New-CustomerAlertEmail `
+                    -Alert $Alert `
+                    -AlertMessage $Request.Body.alertMessage `
+                    -DeviceName $Alert.alertSourceInfo.deviceName `
+                    -AlertType $ParsedAlertType
+            
+                $subjectPrefix = Get-AlertingConfig -Path "CustomerAlertRouting.EmailSubjectPrefix" -DefaultValue "System Alert:"
+                $customerEmailSubject = "$subjectPrefix $ParsedAlertType - $($Alert.alertSourceInfo.deviceName)"
+            
+                # Send alert to customer and create tracking ticket
+                $routingResult = Send-AlertToCustomer `
+                    -CustomerEmail $routingDecision.CustomerEmail `
+                    -EmailSubject $customerEmailSubject `
+                    -EmailBody $customerEmailBody `
+                    -HaloTicketCreate $HaloTicketCreate `
+                    -AlertUID $Request.Body.alertUID `
+                    -CustomerName $customerName
+            
+                if ($routingResult.Success) {
+                    Write-Host "✓ Alert successfully routed to customer. Tracking ticket: $($routingResult.TicketId)"
+                
+                    # Set success response and skip normal ticket creation
+                    $responseToSend = @{
+                        StatusCode = [HttpStatusCode]::OK
+                        Body       = "Alert routed to customer: $($routingDecision.CustomerEmail)"
+                    }
+                
+                    # Performance logging
+                    $endTime = Get-Date
+                    $totalDuration = New-TimeSpan -Start $startTime -End $endTime
+                    Write-Host "Total processing time (customer routing): $($totalDuration.TotalSeconds) seconds"
+                
+                    # Exit the try block early - don't create normal ticket
+                    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+                            StatusCode = $responseToSend.StatusCode
+                            Body       = $responseToSend.Body
+                        })
+                    return
+                }
+                else {
+                    Write-Warning "Customer routing failed: $($routingResult.Message). Falling back to normal ticket creation."
+                }
             }
             else {
-                Write-Host "Using default charge rate (contract ticket or rate not specified)"
-            }
-            
-            try {
-                $null = New-HaloAction -Action $ActionUpdate
-                Write-Host "Successfully added resolution action to ticket $ticketidHalo"
-            } catch {
-                Write-Host "ERROR adding resolution action to ticket $ticketidHalo`: $($_.Exception.Message)" -ForegroundColor Red
-            }
-        } else {
-            Write-Host "No matching open ticket found for Alert UID: $targetUID"
-            
-            # Check if there's a closed ticket with this UID for informational purposes
-            $closedAlert = $alertsFromReport | Where-Object { $_.CFDattoAlertUID -eq $targetUID }
-            if ($closedAlert) {
-                Write-Host "Found closed ticket with this UID: $($closedAlert.Faultid) (Status: $($closedAlert.tstatusdesc))"
+                Write-Host "✗ Alert will be processed normally (reason: $($routingDecision.Reason))"
             }
         }
-    } catch {
-        Write-Host "ERROR searching for existing tickets using report: $($_.Exception.Message)" -ForegroundColor Red
-        # Continue processing normally if search fails
-    }
-    
-    if ($Request.Body.resolvedAlert -eq "true") {
-        Write-Host "Processing resolved alert for UID: $targetUID"
-        
-        if ($null -ne $ticketidHalo) {
-            Write-Host "Closing ticket ID: $ticketidHalo"
-            $TicketID = $ticketidHalo
-        
-            # Close the ticket
-            $TicketUpdate = @{
-                id        = $TicketID 
-                status_id = 9
-                agent_id  = 1
-            }
-            
-            try {
-                Set-HaloTicket -Ticket $TicketUpdate
-                Write-Host "Successfully closed ticket $TicketID"
-            } catch {
-                Write-Host "ERROR closing ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
-            }
+        elseif ($customerRoutingEnabled -and $Request.Body.resolvedAlert) {
+            Write-Host "Customer routing check skipped (resolved alert)"
+        }
+        else {
+            Write-Host "Customer alert routing is disabled in configuration"
+        }
 
-            # Mark all actions as reviewed
-            try {
-                $Actions = Get-HaloAction -TicketID $TicketID -Count 10000
-                Write-Host "Retrieved $($Actions.Count) actions to mark as reviewed for ticket $TicketID"
-
-                # Mass review logic
-                foreach ($action in $actions) {
-                   $ReviewData = @{
-                       ticket_id = $action.ticket_id
-                       id = $action.id
-                       actreviewed = "true"
-                    }
-                    try {
-                        Set-HaloAction -Action $ReviewData
-                    } catch {
-                        Write-Host "WARNING: Failed to mark action $($action.id) as reviewed: $($_.Exception.Message)" -ForegroundColor Yellow
-                    }
+        $HaloTicketCreate = @{
+            summary         = $TicketSubject
+            tickettype_id   = $contractDecision.TicketTypeId  # Dynamic based on contract eligibility
+            details_html    = $HtmlBody
+            DattoAlertState = 0
+            site_id         = $HaloSiteIDDatto
+            assets          = @(@{id = $HaloDevice.did })
+            priority_id     = $HaloPriority
+            status_id       = $HaloTicketStatusID
+            category_1      = Get-AlertingConfig -Path "TicketDefaults.Category1" -DefaultValue "Datto Alert"
+            customfields    = @(
+                @{
+                    id    = $HaloCustomAlertTypeField
+                    value = $ParsedAlertType
+                };
+                @{
+                    id    = $DattoAlertUIDField
+                    value = $Request.Body.alertUID
                 }
-                Write-Host "Completed marking actions as reviewed for ticket $TicketID"
-            } catch {
-                Write-Host "ERROR marking actions as reviewed for ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
-            }
+            )
+        }
+    
+        # Only add contract_id if it's not null (for eligible devices)
+        if ($contractDecision.ContractId) {
+            $HaloTicketCreate.contract_id = $contractDecision.ContractId
+            Write-Host "Adding contract ID $($contractDecision.ContractId) to ticket"
+        }
+        else {
+            Write-Host "No contract ID added (non-contract ticket)"
+        }
+    
+        # Store contract decision for later use (e.g., in action creation)
+        $script:ContractDecision = $contractDecision
 
-            # Create invoice
-            try {
-                $dateInvoice = Get-Date
-                $invoice = @{ 
-                    client_id = $HaloClientDattoMatch
-                    invoice_date = $dateInvoice
-                    lines = @(@{entity_type = "labour"; ticket_id = $TicketID})
+        # Check for existing ticket with this alert UID using the Alerts Report
+        $ticketidHalo = $null
+        $targetUID = $Request.Body.alertUID
+    
+        Write-Host "Searching for existing ticket with Alert UID: $targetUID"
+    
+        # Use the Alerts Report to find tickets with matching CFDattoAlertUID
+        try {
+            $alertsFromReport = Invoke-HaloReport -Report $HaloAlertsReportBase -IncludeReport
+            Write-Host "Retrieved $($alertsFromReport.Count) alerts from report for UID search"
+        
+            # Find tickets with matching CFDattoAlertUID that are still open (not status 9)
+            $matchingAlert = $alertsFromReport | Where-Object { 
+                $_.CFDattoAlertUID -eq $targetUID -and $_.tstatusdesc -ne "Closed"
+            }
+        
+            if ($matchingAlert) {
+                $ticketidHalo = $matchingAlert.Faultid
+                Write-Host "Found matching open ticket with ID: $ticketidHalo (Status: $($matchingAlert.tstatusdesc))"
+            
+                # Add the "Resolved by Datto Automation" action
+                $dateArrival = (Get-Date).AddMinutes(-5)
+                $dateEnd = Get-Date
+                Write-Host "Adding resolution action - Arrival: $dateArrival, End: $dateEnd"
+            
+                # Build action with appropriate charge rate
+                $ActionUpdate = @{
+                    ticket_id            = $ticketidHalo
+                    actionid             = 23
+                    outcome              = "Remote"
+                    outcome_id           = 23
+                    note                 = "Resolved by Datto Automation"
+                    actionarrivaldate    = $dateArrival
+                    actioncompletiondate = $dateEnd
+                    action_isresponse    = $false
+                    validate_response    = $false
+                    sendemail            = $false
+                }
+            
+                # Apply charge rate if this is a non-contract ticket
+                # Check if we have the contract decision from ticket creation
+                if ($script:ContractDecision -and $script:ContractDecision.ChargeRate -eq 0) {
+                    $ActionUpdate.chargerate = 0
+                    Write-Host "Applied charge rate 0 (non-contract ticket)"
+                }
+                elseif ($script:ContractDecision -and $script:ContractDecision.TicketTypeId -ne 8) {
+                    # Non-contract ticket type - apply no charge
+                    $ActionUpdate.chargerate = 0
+                    Write-Host "Applied charge rate 0 (non-contract ticket type: $($script:ContractDecision.TicketTypeId))"
+                }
+                else {
+                    Write-Host "Using default charge rate (contract ticket or rate not specified)"
+                }
+            
+                try {
+                    $null = New-HaloAction -Action $ActionUpdate
+                    Write-Host "Successfully added resolution action to ticket $ticketidHalo"
+                }
+                catch {
+                    Write-Host "ERROR adding resolution action to ticket $ticketidHalo`: $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+            else {
+                Write-Host "No matching open ticket found for Alert UID: $targetUID"
+            
+                # Check if there's a closed ticket with this UID for informational purposes
+                $closedAlert = $alertsFromReport | Where-Object { $_.CFDattoAlertUID -eq $targetUID }
+                if ($closedAlert) {
+                    Write-Host "Found closed ticket with this UID: $($closedAlert.Faultid) (Status: $($closedAlert.tstatusdesc))"
+                }
+            }
+        }
+        catch {
+            Write-Host "ERROR searching for existing tickets using report: $($_.Exception.Message)" -ForegroundColor Red
+            # Continue processing normally if search fails
+        }
+    
+        if ($Request.Body.resolvedAlert -eq "true") {
+            Write-Host "Processing resolved alert for UID: $targetUID"
+        
+            if ($null -ne $ticketidHalo) {
+                Write-Host "Closing ticket ID: $ticketidHalo"
+                $TicketID = $ticketidHalo
+        
+                # Close the ticket
+                $TicketUpdate = @{
+                    id        = $TicketID 
+                    status_id = 9
+                    agent_id  = 1
+                }
+            
+                try {
+                    Set-HaloTicket -Ticket $TicketUpdate
+                    Write-Host "Successfully closed ticket $TicketID"
+                }
+                catch {
+                    Write-Host "ERROR closing ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
                 }
 
-                $null = New-HaloInvoice -Invoice $invoice 
-                Write-Host "Successfully created invoice for ticket $TicketID and client $HaloClientDattoMatch"
-            } catch {
-                Write-Host "ERROR creating invoice for ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
+                # Mark all actions as reviewed
+                try {
+                    $Actions = Get-HaloAction -TicketID $TicketID -Count 10000
+                    Write-Host "Retrieved $($Actions.Count) actions to mark as reviewed for ticket $TicketID"
+
+                    # Mass review logic
+                    foreach ($action in $actions) {
+                        $ReviewData = @{
+                            ticket_id   = $action.ticket_id
+                            id          = $action.id
+                            actreviewed = "true"
+                        }
+                        try {
+                            Set-HaloAction -Action $ReviewData
+                        }
+                        catch {
+                            Write-Host "WARNING: Failed to mark action $($action.id) as reviewed: $($_.Exception.Message)" -ForegroundColor Yellow
+                        }
+                    }
+                    Write-Host "Completed marking actions as reviewed for ticket $TicketID"
+                }
+                catch {
+                    Write-Host "ERROR marking actions as reviewed for ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
+                }
+
+                # Create invoice
+                try {
+                    $dateInvoice = Get-Date
+                    $invoice = @{ 
+                        client_id    = $HaloClientDattoMatch
+                        invoice_date = $dateInvoice
+                        lines        = @(@{entity_type = "labour"; ticket_id = $TicketID })
+                    }
+
+                    $null = New-HaloInvoice -Invoice $invoice 
+                    Write-Host "Successfully created invoice for ticket $TicketID and client $HaloClientDattoMatch"
+                }
+                catch {
+                    Write-Host "ERROR creating invoice for ticket $TicketID`: $($_.Exception.Message)" -ForegroundColor Red
+                }
             }
-        } else {
-            Write-Host "No ticket ID found to close for resolved alert UID: $targetUID" -ForegroundColor Yellow
+            else {
+                Write-Host "No ticket ID found to close for resolved alert UID: $targetUID" -ForegroundColor Yellow
+            }
+        
         }
+        else {
+            # Check for alert consolidation before creating new tickets
+            Write-Host "Checking if alert should be consolidated with existing ticket..."
         
-    } else {
-        # Check for alert consolidation before creating new tickets
-        Write-Host "Checking if alert should be consolidated with existing ticket..."
+            # First check for memory usage alerts
+            $wasConsolidated = $false
+            if ($TicketSubject -like "*Memory Usage reached*") {
+                Write-Host "Detected memory usage alert, checking for memory usage consolidation..."
+                $wasConsolidated = Test-MemoryUsageConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+            }
         
-        # First check for memory usage alerts
-        $wasConsolidated = $false
-        if ($TicketSubject -like "*Memory Usage reached*") {
-            Write-Host "Detected memory usage alert, checking for memory usage consolidation..."
-            $wasConsolidated = Test-MemoryUsageConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
-        }
+            # If not a memory usage alert or memory consolidation failed, try general consolidation
+            if (-not $wasConsolidated) {
+                $wasConsolidated = Test-AlertConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
+            }
         
-        # If not a memory usage alert or memory consolidation failed, try general consolidation
-        if (-not $wasConsolidated) {
-            $wasConsolidated = Test-AlertConsolidation -HaloTicketCreate $HaloTicketCreate -AlertWebhook $AlertWebhook
-        }
-        
-        if ($wasConsolidated) {
-            Write-Host "Alert was successfully consolidated with existing ticket. No new ticket created."
-        } else {
-            Write-Host "No consolidation performed. Processing alert normally..."
+            if ($wasConsolidated) {
+                Write-Host "Alert was successfully consolidated with existing ticket. No new ticket created."
+            }
+            else {
+                Write-Host "No consolidation performed. Processing alert normally..."
             
-            # Handle Specific Ticket responses based on ticket subject type
-            # Check if the alert message contains the specific disk usage alert for the C: drive
-            if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
-                Invoke-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
-            } elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
-                Invoke-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
-            } elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
-                Invoke-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
-                #Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
-            } elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
-                Invoke-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
-            } elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
-                Invoke-HostsAlert -HaloTicketCreate $HaloTicketCreate
-            } else {
-                Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+                # Handle Specific Ticket responses based on ticket subject type
+                # Check if the alert message contains the specific disk usage alert for the C: drive
+                if ($TicketSubject -like "*Alert: Disk Usage - C:*") {
+                    Invoke-DiskUsageAlert -Request $Request -HaloTicketCreate $HaloTicketCreate -HaloClientDattoMatch $HaloClientDattoMatch
+                }
+                elseif ($TicketSubject -like "*Monitor Hyper-V Replication*") {
+                    Invoke-HyperVReplicationAlert -HaloTicketCreate $HaloTicketCreate
+                }
+                elseif ($TicketSubject -like "*Alert: Patch Monitor - Failure whilst running Patch Policy*") {
+                    Invoke-PatchMonitorAlert -AlertWebhook $AlertWebhook -HaloTicketCreate $HaloTicketCreate -tableName $tableName
+                    #Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+                }
+                elseif ($TicketSubject -like "*Alert: Event Log - Backup Exec*") {
+                    Invoke-BackupExecAlert -HaloTicketCreate $HaloTicketCreate
+                }
+                elseif ($TicketSubject -like "*HOSTS Integrity Monitor*") {
+                    Invoke-HostsAlert -HaloTicketCreate $HaloTicketCreate
+                }
+                else {
+                    Invoke-DefaultAlert -HaloTicketCreate $HaloTicketCreate
+                }
             }
         }
+        #$HaloTicketCreate | Out-String | Write-Host #Enable for Debugging
+    
+        # Performance logging
+        $endTime = Get-Date
+        $totalDuration = New-TimeSpan -Start $startTime -End $endTime
+        Write-Host "Total processing time: $($totalDuration.TotalSeconds) seconds"
+    
+        # Set success response
+        $responseToSend = @{
+            StatusCode = [HttpStatusCode]::OK
+            Body       = "Alert processed successfully"
+        }
+    
     }
-    #$HaloTicketCreate | Out-String | Write-Host #Enable for Debugging
-    
-    # Performance logging
-    $endTime = Get-Date
-    $totalDuration = New-TimeSpan -Start $startTime -End $endTime
-    Write-Host "Total processing time: $($totalDuration.TotalSeconds) seconds"
-    
-    # Set success response
-    $responseToSend = @{
-        StatusCode = [HttpStatusCode]::OK
-        Body       = "Alert processed successfully"
-    }
-    
-    } else {
+    else {
         Write-Host "No alert found. This webhook shouldn't be triggered this way except when testing!!!!"
         $endTime = Get-Date
         $totalDuration = New-TimeSpan -Start $startTime -End $endTime
@@ -579,11 +602,11 @@ catch {
     
     # Log structured error information for monitoring
     $errorDetails = @{
-        AlertUID = $alertUID
-        Error = $errorMessage
-        Line = $errorLine
-        Command = $errorCommand
-        Duration = $totalDuration.TotalSeconds
+        AlertUID  = $alertUID
+        Error     = $errorMessage
+        Line      = $errorLine
+        Command   = $errorCommand
+        Duration  = $totalDuration.TotalSeconds
         Timestamp = $endTime.ToString('yyyy-MM-dd HH:mm:ss')
     }
     
@@ -599,7 +622,7 @@ catch {
 # Send the final response (only one Push-OutputBinding call in entire script)
 if ($responseToSend) {
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-        StatusCode = $responseToSend.StatusCode
-        Body       = $responseToSend.Body
-    })
+            StatusCode = $responseToSend.StatusCode
+            Body       = $responseToSend.Body
+        })
 }
